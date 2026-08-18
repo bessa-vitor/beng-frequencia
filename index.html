@@ -570,6 +570,45 @@ function computeRateioSienge(year, month, tipo, funcionarioId){
   }).filter(r=>r.linhas.length>0);
 }
 
+/* ---- Peso por obra, separado por vínculo (AVULSO / CONTRATADO) ----
+   Ex.: peso da obra X entre avulsos = custo da obra X só com avulsos
+   dividido pelo custo TOTAL de avulsos no período (não o total geral). */
+function computeRateioPorVinculo(year, month, tipo){
+  const {start, end} = periodRange(year, month, tipo);
+  const entries = state.frequencia.filter(f=>{
+    const d = new Date(f.data + "T00:00:00");
+    return d.getFullYear()===year && (d.getMonth()+1)===month && d.getDate()>=start && d.getDate()<=end;
+  });
+  const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
+  const VINCULOS = ["AVULSO","CONTRATADO"];
+  const porObra = { AVULSO:{}, CONTRATADO:{}, OUTROS:{} };
+  const totalGrupo = { AVULSO:0, CONTRATADO:0, OUTROS:0 };
+
+  entries.forEach(e=>{
+    const f = funcById(e.funcionarioId);
+    const o = obraById(e.obraId);
+    if(!f || !o) return;
+    const grupo = VINCULOS.includes(f.vinculo) ? f.vinculo : "OUTROS";
+    const valor = Number(f.valorDiaria)||0;
+    porObra[grupo][o.id] = (porObra[grupo][o.id]||0) + valor;
+    totalGrupo[grupo] += valor;
+  });
+
+  function linhasDoGrupo(grupo){
+    return obrasAtivas.map(o=>{
+      const valor = porObra[grupo][o.id] || 0;
+      const peso = totalGrupo[grupo] > 0 ? (valor/totalGrupo[grupo]*100) : 0;
+      return { obra:o, valor, peso };
+    }).filter(l=>l.valor>0).sort((a,b)=>b.valor-a.valor);
+  }
+
+  return {
+    avulso: { linhas: linhasDoGrupo("AVULSO"), total: totalGrupo.AVULSO },
+    contratado: { linhas: linhasDoGrupo("CONTRATADO"), total: totalGrupo.CONTRATADO },
+    outros: { linhas: linhasDoGrupo("OUTROS"), total: totalGrupo.OUTROS }
+  };
+}
+
 /* ============================================================
    FIRESTORE — leitura em tempo real + escrita
 ============================================================ */
@@ -1041,19 +1080,39 @@ function renderRateio(){
   const ativos = state.funcionarios.filter(f=>f.ativo!==false);
   const selFuncId = state.rateioFuncId || "";
   const linhas = computeRateioSienge(state.period.year, state.period.month, state.period.tipo, selFuncId || null);
+  const vinc = computeRateioPorVinculo(state.period.year, state.period.month, state.period.tipo);
 
   el.innerHTML = `
     <div class="page-head">
       <div>
         <span class="eyebrow">Pronto para o Sienge</span>
         <h2>Rateio por peso</h2>
-        <p class="sub">${periodLabel(state.period.year, state.period.month, state.period.tipo)} — use o peso (%) ao criar o título com múltiplas obras</p>
+        <p class="sub">${periodLabel(state.period.year, state.period.month, state.period.tipo)} — peso (%) de cada obra dentro do custo total de avulsos e de contratados</p>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:18px;padding:16px 20px;">${periodPickerHtml("rat")}</div>
+
+    <div class="grid-2" style="align-items:start;margin-bottom:20px;">
+      ${vinculoCardHtml("Avulsos", vinc.avulso, "avulso")}
+      ${vinculoCardHtml("Contratados", vinc.contratado, "contratado")}
+    </div>
+    ${vinc.outros.linhas.length ? `<div class="card" style="margin-bottom:20px;">
+      <p style="font-size:12px;color:var(--steel-600);margin-bottom:10px;">
+        Funcionários sem vínculo AVULSO/CONTRATADO definido no cadastro — ajuste o cadastro para eles entrarem numa das colunas acima.
+      </p>
+      ${vinculoCardHtml("Outros / sem vínculo definido", vinc.outros, "outros", true)}
+    </div>` : ""}
+
+    <div class="page-head" style="margin-bottom:14px;">
+      <div>
+        <span class="eyebrow">Detalhe</span>
+        <h2 style="font-size:17px;">Peso por funcionário dentro de cada obra</h2>
+        <p class="sub">Quanto do custo de cada funcionário foi para cada obra — informação complementar.</p>
       </div>
       <button class="btn dark" id="btn-copiar-rateio">Copiar tabela</button>
     </div>
-    <div class="card" style="margin-bottom:18px;padding:16px 20px;">
-      ${periodPickerHtml("rat")}
-      <div class="field" style="margin-top:12px;max-width:280px;">
+    <div class="card" style="margin-bottom:18px;padding:14px 20px;">
+      <div class="field" style="max-width:280px;margin:0;">
         <label>Funcionário</label>
         <select id="rat-func">
           <option value="">Todos os funcionários</option>
@@ -1097,6 +1156,42 @@ function renderRateio(){
     navigator.clipboard.writeText(txt).then(()=>toast("Tabela copiada — cole no Sienge ou no Excel", "ok"))
       .catch(()=>toast("Não foi possível copiar automaticamente", "err"));
   });
+  el.querySelectorAll("[data-copiar-vinculo]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.copiarVinculo;
+      const grupo = key==="avulso"?vinc.avulso : key==="contratado"?vinc.contratado : vinc.outros;
+      if(!grupo.linhas.length){ toast("Nada para copiar", "err"); return; }
+      let txt = `Obra\tCusto\tPeso\r\n`;
+      grupo.linhas.forEach(l=> txt += `${l.obra.nome} (${l.obra.sigla})\t${l.valor.toFixed(2).replace(".",",")}\t${l.peso.toFixed(1).replace(".",",")}%\r\n`);
+      txt += `Total\t${grupo.total.toFixed(2).replace(".",",")}\t100,0%\r\n`;
+      navigator.clipboard.writeText(txt).then(()=>toast("Tabela copiada — cole no Sienge ou no Excel", "ok"))
+        .catch(()=>toast("Não foi possível copiar automaticamente", "err"));
+    });
+  });
+}
+
+function vinculoCardHtml(titulo, grupo, key, semAcao){
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+      <h3 style="font-size:14.5px;">${titulo}</h3>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="mono" style="font-size:12.5px;color:var(--steel-600);">total ${brl(grupo.total)}</span>
+        ${!semAcao ? `<button class="btn small" data-copiar-vinculo="${key}">Copiar</button>` : ""}
+      </div>
+    </div>
+    ${!grupo.linhas.length ? emptyState("Sem custo", `Nenhum lançamento de ${titulo.toLowerCase()} neste período.`) : `
+    <table>
+      <thead><tr><th>Obra</th><th class="num-cell">Custo</th><th class="num-cell">Peso</th></tr></thead>
+      <tbody>
+        ${grupo.linhas.map(l=>`<tr>
+          <td><span class="tag ${obraColorClass(l.obra.id)}">${escapeHtml(l.obra.sigla)}</span> ${escapeHtml(l.obra.nome)}</td>
+          <td class="num-cell mono">${brl(l.valor)}</td>
+          <td class="num-cell mono" style="font-weight:700;">${pct(l.peso)}</td>
+        </tr>`).join("")}
+        <tr class="total-row"><td>Total</td><td class="num-cell mono">${brl(grupo.total)}</td><td class="num-cell mono">100,0%</td></tr>
+      </tbody>
+    </table>`}
+  </div>`;
 }
 
 /* ============================================================
