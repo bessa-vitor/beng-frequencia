@@ -251,14 +251,16 @@
   .obs-item .obs-who{font-size:12px;color:var(--steel-600);}
   .obs-item .obs-text{font-size:13.5px;line-height:1.5;white-space:pre-wrap;}
   .obs-item .obs-actions{margin-top:6px;}
-  #print-area{display:none;}
+  .print-area{display:none;}
   @media print{
     body *{visibility:hidden;}
-    #print-area, #print-area *{visibility:visible;}
-    #print-area{position:absolute;left:0;top:0;width:100%;display:block;padding:16px;}
-    #print-area .print-head{margin-bottom:18px;border-bottom:2px solid #000;padding-bottom:10px;}
-    #print-area .print-logo{height:32px;margin-bottom:8px;}
-    #print-area .obs-item{break-inside:avoid;}
+    .print-area, .print-area *{visibility:visible;}
+    .print-area{position:absolute;left:0;top:0;width:100%;display:block;padding:16px;}
+    .print-area .print-head{margin-bottom:18px;border-bottom:2px solid #000;padding-bottom:10px;}
+    .print-area .print-logo{height:32px;margin-bottom:8px;}
+    .print-area .obs-item{break-inside:avoid;}
+    .print-area table{break-inside:auto;}
+    .print-area tr{break-inside:avoid;}
   }
   .obra-opt{
     display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:1px solid var(--line);
@@ -281,6 +283,19 @@
   .pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--paper-100);color:var(--steel-600);}
   .pill.on{background:var(--moss-100);color:var(--moss-600);}
   .pill.off{background:var(--brick-100);color:var(--brick-600);}
+
+  .trend-up{color:var(--brick-600);font-weight:700;}
+  .trend-down{color:var(--moss-600);font-weight:700;}
+
+  .alert-item{
+    display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-radius:var(--radius-s);
+    font-size:13px;line-height:1.45;margin-bottom:8px;
+  }
+  .alert-item:last-child{margin-bottom:0;}
+  .alert-item.warn{background:var(--amber-100);color:#6B4E10;}
+  .alert-item.info{background:var(--slate-100);color:var(--ink-900);}
+  .alert-item.ok{background:var(--moss-100);color:var(--ink-900);}
+  .alert-icon{flex-shrink:0;font-size:14px;line-height:1.4;}
 
   .empty-state{
     text-align:center;padding:48px 20px;color:var(--steel-600);
@@ -358,9 +373,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
       Frequência
     </button>
-    <button class="nav-item" data-view="fechamento">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a1 1 0 011-1h9l6 6v9a1 1 0 01-1 1H5a1 1 0 01-1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
-      Fechamento
+    <button class="nav-item" data-view="quentinhas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8a8 8 0 0116 0v1H4V8z"/><path d="M3 9h18l-1.2 9.5a2 2 0 01-2 1.5H6.2a2 2 0 01-2-1.5L3 9z"/><path d="M9 3.5C9 5 12 5 12 3.5"/></svg>
+      Quentinhas
     </button>
     <button class="nav-item" data-view="rateio">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12A9 9 0 113.5 7"/><path d="M21 3v6h-6"/></svg>
@@ -369,6 +384,10 @@
     <button class="nav-item" data-view="observacoes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       Observações
+    </button>
+    <button class="nav-item" data-view="relatorios">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h9l3 3v14a2 2 0 01-2 2H6a2 2 0 01-2-2V9z"/><path d="M15 2v4h4"/><path d="M8 13h8M8 17h8M8 9h3"/></svg>
+      Relatórios
     </button>
     <button class="nav-item" data-view="cadastro">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c1-3.6 3.6-5.6 6.5-5.6s5.5 2 6.5 5.6M17 8h5M19.5 5.5v5"/></svg>
@@ -383,9 +402,10 @@
   <main>
     <section class="view active" id="view-dashboard"></section>
     <section class="view" id="view-frequencia"></section>
-    <section class="view" id="view-fechamento"></section>
+    <section class="view" id="view-quentinhas"></section>
     <section class="view" id="view-rateio"></section>
     <section class="view" id="view-observacoes"></section>
+    <section class="view" id="view-relatorios"></section>
     <section class="view" id="view-cadastro"></section>
   </main>
 
@@ -399,21 +419,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
         Freq.
       </button>
-      <button class="bn-item" data-view="fechamento">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a1 1 0 011-1h9l6 6v9a1 1 0 01-1 1H5a1 1 0 01-1-1z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
-        Fecham.
+      <button class="bn-item" data-view="quentinhas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8a8 8 0 0116 0v1H4V8z"/><path d="M3 9h18l-1.2 9.5a2 2 0 01-2 1.5H6.2a2 2 0 01-2-1.5L3 9z"/></svg>
+        Quent.
       </button>
       <button class="bn-item" data-view="rateio">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12A9 9 0 113.5 7"/><path d="M21 3v6h-6"/></svg>
         Rateio
       </button>
-      <button class="bn-item" data-view="observacoes">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        Obs.
-      </button>
-      <button class="bn-item" data-view="cadastro">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c1-3.6 3.6-5.6 6.5-5.6s5.5 2 6.5 5.6M17 8h5M19.5 5.5v5"/></svg>
-        Cadastro
+      <button class="bn-item" id="bn-mais">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+        Mais
       </button>
     </div>
   </nav>
@@ -472,9 +488,13 @@ const state = {
   obras: [],
   frequencia: [],
   observacoes: [],
+  quentinhas: [],
+  config: { valorQuentinha: 0 },
   currentView: "dashboard",
   period: { year: today.getFullYear(), month: today.getMonth()+1, tipo: "mensal" },
   freqSel: { dateISO: dateStr(today.getFullYear(), today.getMonth()+1, today.getDate()), obraId: null },
+  quentSel: { dateISO: dateStr(today.getFullYear(), today.getMonth()+1, today.getDate()), obraId: null },
+  relSel: { tipo: "fechamento", obraId: null, funcionarioId: null },
   unsub: []
 };
 
@@ -533,10 +553,11 @@ function computeFechamento(year, month, tipo){
 
   const matrix = {}; // matrix[funcId][obraId] = {dias, valor}
   const totalPorFuncionario = {};
+  const totalDiasPorFuncionario = {};
   const totalPorObra = {};
   let grandTotalValor = 0, grandTotalDias = 0;
 
-  funcsAtivos.forEach(f=>{ matrix[f.id]={}; totalPorFuncionario[f.id]=0; });
+  funcsAtivos.forEach(f=>{ matrix[f.id]={}; totalPorFuncionario[f.id]=0; totalDiasPorFuncionario[f.id]=0; });
   obrasAtivas.forEach(o=>{ totalPorObra[o.id]=0; });
 
   entries.forEach(e=>{
@@ -548,12 +569,27 @@ function computeFechamento(year, month, tipo){
     matrix[f.id][o.id].dias += 1;
     matrix[f.id][o.id].valor += Number(f.valorDiaria)||0;
     totalPorFuncionario[f.id] = (totalPorFuncionario[f.id]||0) + (Number(f.valorDiaria)||0);
+    totalDiasPorFuncionario[f.id] = (totalDiasPorFuncionario[f.id]||0) + 1;
     totalPorObra[o.id] = (totalPorObra[o.id]||0) + (Number(f.valorDiaria)||0);
     grandTotalValor += Number(f.valorDiaria)||0;
     grandTotalDias += 1;
   });
 
-  return { obrasAtivas, funcsAtivos, matrix, totalPorFuncionario, totalPorObra, grandTotalValor, grandTotalDias, entries };
+  return { obrasAtivas, funcsAtivos, matrix, totalPorFuncionario, totalDiasPorFuncionario, totalPorObra, grandTotalValor, grandTotalDias, entries };
+}
+
+/* Período imediatamente anterior ao selecionado, no mesmo formato
+   (quinzena anterior ou mês anterior), para comparar variação. */
+function previousPeriod(year, month, tipo){
+  if(tipo === "q2") return { year, month, tipo:"q1" };
+  if(tipo === "q1"){
+    const m = month===1?12:month-1;
+    const y = month===1?year-1:year;
+    return { year:y, month:m, tipo:"q2" };
+  }
+  const m = month===1?12:month-1;
+  const y = month===1?year-1:year;
+  return { year:y, month:m, tipo:"mensal" };
 }
 
 function computeRateioSienge(year, month, tipo, funcionarioId){
@@ -634,7 +670,17 @@ function startListeners(){
     renderAll();
   }, err=>{ console.error(err); toast("Erro ao carregar observações. Veja o console.", "err"); });
 
-  state.unsub.push(unsubF, unsubO, unsubFr, unsubObs);
+  const unsubQ = onSnapshot(query(collection(db,"quentinhas")), snap=>{
+    state.quentinhas = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderAll();
+  }, err=>{ console.error(err); toast("Erro ao carregar quentinhas. Veja o console.", "err"); });
+
+  const unsubCfg = onSnapshot(doc(db,"config","geral"), snap=>{
+    state.config = snap.exists() ? { valorQuentinha: 0, ...snap.data() } : { valorQuentinha: 0 };
+    renderAll();
+  }, err=>{ console.error(err); toast("Erro ao carregar configurações. Veja o console.", "err"); });
+
+  state.unsub.push(unsubF, unsubO, unsubFr, unsubObs, unsubQ, unsubCfg);
 }
 
 async function saveFuncionario(data, id){
@@ -661,20 +707,45 @@ async function saveObservacao(data){
 }
 async function removeObservacao(id){ await deleteDoc(doc(db,"observacoes",id)); }
 
+async function setQuentinha(funcionarioId, dataISO, obraId){
+  const id = funcionarioId + "_" + dataISO;
+  if(!obraId){ await deleteDoc(doc(db,"quentinhas",id)); return; }
+  await setDoc(doc(db,"quentinhas",id), { funcionarioId, obraId, data: dataISO });
+}
+async function saveConfig(data){
+  await setDoc(doc(db,"config","geral"), data, {merge:true});
+}
+
 /* ============================================================
    NAVEGAÇÃO
 ============================================================ */
+const BN_MAIS_VIEWS = ["observacoes","relatorios","cadastro"];
 function setView(view){
   state.currentView = view;
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
   document.getElementById("view-"+view).classList.add("active");
-  document.querySelectorAll(".nav-item, .bn-item").forEach(b=>{
+  document.querySelectorAll(".nav-item, .bn-item[data-view]").forEach(b=>{
     b.classList.toggle("active", b.dataset.view === view);
   });
+  document.getElementById("bn-mais")?.classList.toggle("active", BN_MAIS_VIEWS.includes(view));
   renderAll();
 }
-document.querySelectorAll(".nav-item, .bn-item").forEach(btn=>{
+document.querySelectorAll(".nav-item, .bn-item[data-view]").forEach(btn=>{
   btn.addEventListener("click", ()=> setView(btn.dataset.view));
+});
+document.getElementById("bn-mais")?.addEventListener("click", ()=>{
+  modal(`
+    <h3>Mais opções</h3>
+    <p>Escolha uma tela.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn" data-goto="observacoes" style="text-align:left;">Observações</button>
+      <button class="btn" data-goto="relatorios" style="text-align:left;">Relatórios</button>
+      <button class="btn" data-goto="cadastro" style="text-align:left;">Cadastros</button>
+    </div>
+  `);
+  document.querySelectorAll("[data-goto]").forEach(b=>{
+    b.addEventListener("click", ()=>{ closeModal(); setView(b.dataset.goto); });
+  });
 });
 
 function modal(html){
@@ -725,49 +796,103 @@ function bindPeriodPicker(prefix, onChange){
 }
 
 /* ============================================================
+/* ============================================================
    DASHBOARD
 ============================================================ */
-let chartObra=null, chartEvo=null;
 function renderDashboard(){
   const el = document.getElementById("view-dashboard");
   if(state.currentView !== "dashboard") return;
-  const calc = computeFechamento(state.period.year, state.period.month, state.period.tipo);
+  const { year, month, tipo } = state.period;
+  const calc = computeFechamento(year, month, tipo);
+  const prev = previousPeriod(year, month, tipo);
+  const calcPrev = computeFechamento(prev.year, prev.month, prev.tipo);
+
   const obrasComCusto = calc.obrasAtivas.map(o=>({obra:o, valor:calc.totalPorObra[o.id]||0}))
     .filter(x=>x.valor>0).sort((a,b)=>b.valor-a.valor);
-  const ranking = calc.funcsAtivos.map(f=>({f, valor:calc.totalPorFuncionario[f.id]||0}))
-    .filter(x=>x.valor>0).sort((a,b)=>b.valor-a.valor).slice(0,8);
+  const funcsComCusto = calc.funcsAtivos.filter(f=>(calc.totalPorFuncionario[f.id]||0)>0);
+  const ranking = funcsComCusto.map(f=>({f, valor:calc.totalPorFuncionario[f.id]||0, dias:calc.totalDiasPorFuncionario[f.id]||0}))
+    .sort((a,b)=>b.valor-a.valor).slice(0,8);
   const nObrasAtivas = obrasComCusto.length;
-  const nFuncAtivos = ranking.length;
+  const nFuncAtivos = funcsComCusto.length;
+
+  // variação vs período anterior
+  const variacaoPct = calcPrev.grandTotalValor > 0
+    ? (calc.grandTotalValor - calcPrev.grandTotalValor) / calcPrev.grandTotalValor * 100
+    : null;
+
+  // alertas operacionais — só entram itens com base em dados reais
+  const obrasSemLancamento = calc.obrasAtivas.length - nObrasAtivas;
+  const funcSemLancamento = calc.funcsAtivos.length - nFuncAtivos;
+  const obsNoPeriodo = state.observacoes.filter(o=>{
+    if(!o.data) return false;
+    const d = new Date(o.data+"T00:00:00");
+    const {start,end} = periodRange(year, month, tipo);
+    return d.getFullYear()===year && (d.getMonth()+1)===month && d.getDate()>=start && d.getDate()<=end;
+  }).length;
+  const alerts = [];
+  if(obrasSemLancamento>0) alerts.push({tipo:"warn", texto:`${obrasSemLancamento} obra${obrasSemLancamento===1?"":"s"} ativa${obrasSemLancamento===1?"":"s"} sem nenhum lançamento neste período.`});
+  if(funcSemLancamento>0) alerts.push({tipo:"warn", texto:`${funcSemLancamento} funcionário${funcSemLancamento===1?"":"s"} ativo${funcSemLancamento===1?"":"s"} sem lançamento neste período — confira se faltou registrar.`});
+  if(obsNoPeriodo>0) alerts.push({tipo:"info", texto:`${obsNoPeriodo} observação${obsNoPeriodo===1?"":"ões"} registrada${obsNoPeriodo===1?"":"s"} neste período.`});
 
   el.innerHTML = `
     <div class="page-head">
       <div>
         <span class="eyebrow">Painel geral</span>
         <h2>Dashboard</h2>
-        <p class="sub">${periodLabel(state.period.year, state.period.month, state.period.tipo)}</p>
+        <p class="sub">${periodLabel(year, month, tipo)}</p>
       </div>
     </div>
-    <div class="card" style="margin-bottom:20px;padding:16px 20px;">${periodPickerHtml("dash")}</div>
+    <div class="card" style="margin-bottom:20px;padding:12px 18px;">
+      <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:280px;">${periodPickerHtml("dash")}</div>
+        <button class="btn dark" id="btn-export-dash">Exportar resumo (CSV)</button>
+      </div>
+    </div>
 
     <div class="grid-4" style="margin-bottom:20px;">
-      <div class="card kpi"><div class="label">Custo total m.o.</div><div class="value">${brl(calc.grandTotalValor)}</div><div class="delta">${calc.grandTotalDias} diária${calc.grandTotalDias===1?"":"s"} lançada${calc.grandTotalDias===1?"":"s"}</div></div>
+      <div class="card kpi">
+        <div class="label">Custo total m.o.</div>
+        <div class="value">${brl(calc.grandTotalValor)}</div>
+        <div class="delta">${variacaoPct===null
+          ? `<span style="color:var(--steel-600);">sem período anterior p/ comparar</span>`
+          : `<span class="${variacaoPct>=0?"trend-up":"trend-down"}">${variacaoPct>=0?"▲":"▼"} ${pct(Math.abs(variacaoPct))}</span> vs. período anterior`}</div>
+      </div>
+      <div class="card kpi"><div class="label">Diárias lançadas</div><div class="value">${calc.grandTotalDias}</div><div class="delta">no período selecionado</div></div>
       <div class="card kpi"><div class="label">Obras com custo</div><div class="value">${nObrasAtivas}</div><div class="delta">de ${calc.obrasAtivas.length} cadastradas</div></div>
       <div class="card kpi"><div class="label">Equipe ativa</div><div class="value">${nFuncAtivos}</div><div class="delta">de ${calc.funcsAtivos.length} cadastrados</div></div>
-      <div class="card kpi"><div class="label">Custo médio / obra</div><div class="value">${brl(nObrasAtivas? calc.grandTotalValor/nObrasAtivas : 0)}</div><div class="delta">no período</div></div>
     </div>
 
     <div class="grid-2" style="margin-bottom:20px;align-items:start;">
       <div class="card">
         <h3 style="font-size:14.5px;margin-bottom:14px;">Custo por obra</h3>
-        ${obrasComCusto.length? `<canvas id="chart-obra" height="220"></canvas>` : emptyState("Sem lançamentos", "Nenhum custo registrado neste período ainda.")}
+        ${!obrasComCusto.length ? emptyState("Sem lançamentos", "Nenhum custo registrado neste período ainda.") : `
+          ${obrasComCusto.map(x=>{
+            const pctVal = calc.grandTotalValor ? x.valor/calc.grandTotalValor*100 : 0;
+            return `<div style="margin:12px 0;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:5px;gap:8px;">
+                <span style="font-weight:600;display:flex;align-items:center;gap:6px;min-width:0;">
+                  <span class="tag ${obraColorClass(x.obra.id)}">${escapeHtml(x.obra.sigla)}</span>
+                  <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(x.obra.nome)}</span>
+                </span>
+                <span class="mono" style="flex-shrink:0;">${brl(x.valor)} <span style="color:var(--steel-600);">· ${pct(pctVal)}</span></span>
+              </div>
+              <div class="progress-bar"><div class="fill" style="width:${pctVal.toFixed(1)}%;background:${obraHex(x.obra.id)};"></div></div>
+            </div>`;
+          }).join("")}
+          <div style="display:flex;justify-content:space-between;padding-top:10px;margin-top:4px;border-top:2px solid var(--ink-900);font-weight:700;font-size:13px;">
+            <span>Total</span><span class="mono">${brl(calc.grandTotalValor)}</span>
+          </div>`}
       </div>
       <div class="card">
         <h3 style="font-size:14.5px;margin-bottom:6px;">Ranking da equipe</h3>
         ${ranking.length ? ranking.map(r=>{
           const max = ranking[0].valor || 1;
           return `<div style="margin:12px 0;">
-            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;">
-              <span style="font-weight:600;">${escapeHtml(r.f.nome)}</span>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:5px;">
+              <span>
+                <span style="font-weight:600;">${escapeHtml(r.f.nome)}</span>
+                <span style="display:block;font-size:11.5px;color:var(--steel-600);font-weight:400;">${escapeHtml(r.f.funcao||"—")} · ${r.dias} diária${r.dias===1?"":"s"}</span>
+              </span>
               <span class="mono">${brl(r.valor)}</span>
             </div>
             <div class="progress-bar"><div class="fill" style="width:${(r.valor/max*100).toFixed(0)}%;background:var(--amber-600);"></div></div>
@@ -777,40 +902,30 @@ function renderDashboard(){
     </div>
 
     <div class="card">
-      <h3 style="font-size:14.5px;margin-bottom:14px;">Peso de cada obra no custo de mão de obra</h3>
-      ${obrasComCusto.length ? `<table><thead><tr><th>Obra</th><th class="num-cell">Custo</th><th class="num-cell">Peso</th></tr></thead><tbody>
-        ${obrasComCusto.map(x=>`<tr>
-          <td><span class="tag ${obraColorClass(x.obra.id)}">${escapeHtml(x.obra.sigla)}</span> ${escapeHtml(x.obra.nome)}</td>
-          <td class="num-cell mono">${brl(x.valor)}</td>
-          <td class="num-cell mono">${pct(calc.grandTotalValor? x.valor/calc.grandTotalValor*100:0)}</td>
-        </tr>`).join("")}
-        <tr class="total-row"><td>Total</td><td class="num-cell mono">${brl(calc.grandTotalValor)}</td><td class="num-cell mono">100,0%</td></tr>
-      </tbody></table>` : emptyState("Nada por aqui", "Lance frequências para ver o rateio entre obras.")}
+      <h3 style="font-size:14.5px;margin-bottom:12px;">Alertas operacionais</h3>
+      ${alerts.length ? alerts.map(a=>`
+        <div class="alert-item ${a.tipo}">
+          <span class="alert-icon">${a.tipo==="warn"?"⚠":"ℹ"}</span>
+          <span>${a.texto}</span>
+        </div>`).join("") : `
+        <div class="alert-item ok"><span class="alert-icon">✓</span><span>Tudo lançado — nenhuma obra ou funcionário ativo ficou de fora neste período.</span></div>`}
     </div>
   `;
   bindPeriodPicker("dash", renderAll);
 
-  if(obrasComCusto.length){
-    const ctx = document.getElementById("chart-obra");
-    if(chartObra) chartObra.destroy();
-    chartObra = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: obrasComCusto.map(x=>x.obra.sigla),
-        datasets: [{
-          data: obrasComCusto.map(x=>x.valor),
-          backgroundColor: obrasComCusto.map(x=>obraHex(x.obra.id)),
-          borderRadius: 5,
-          maxBarThickness: 46
-        }]
-      },
-      options: {
-        responsive:true,
-        plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>brl(c.raw)}}},
-        scales:{ y:{ ticks:{ callback:v=>"R$ "+v }, grid:{color:"#EAE7DC"} }, x:{grid:{display:false}} }
-      }
+  document.getElementById("btn-export-dash").addEventListener("click", ()=>{
+    const rows = [
+      ["Resumo do dashboard", periodLabel(year, month, tipo)],
+      [],
+      ["Obra","Custo","Peso %"]
+    ];
+    obrasComCusto.forEach(x=>{
+      const pctVal = calc.grandTotalValor ? x.valor/calc.grandTotalValor*100 : 0;
+      rows.push([x.obra.nome, x.valor.toFixed(2).replace(".",","), pctVal.toFixed(1).replace(".",",")+"%"]);
     });
-  }
+    rows.push(["Total", calc.grandTotalValor.toFixed(2).replace(".",","), "100,0%"]);
+    downloadCsv(rows, `dashboard_${periodFileTag()}.csv`);
+  });
 }
 function obraHex(obraId){
   const map = ["#004422","#B8842A","#55707C","#8B4A3D","#6E5B7A","#49584F"];
@@ -826,9 +941,35 @@ function emptyState(title, sub){
    a obra e marca quem trabalhou lá. Um funcionário só pode estar
    em uma obra por dia — marcar em outra move automaticamente.
 ============================================================ */
+let freqTab = "lancamento";
 function renderFrequencia(){
   const el = document.getElementById("view-frequencia");
   if(state.currentView !== "frequencia") return;
+
+  el.innerHTML = `
+    <div class="page-head">
+      <div>
+        <span class="eyebrow">${freqTab==="lancamento"?"Escolha o dia e a obra":"Grade de custo"}</span>
+        <h2>Frequência</h2>
+        <p class="sub">${freqTab==="lancamento"
+          ? "Marque quem trabalhou em cada obra no dia. Um funcionário só pode estar em uma obra por dia."
+          : "Valor = dias trabalhados × diária, por funcionário e por obra."}</p>
+      </div>
+    </div>
+    <div class="segmented" style="margin-bottom:18px;">
+      <button data-freqtab="lancamento" class="${freqTab==="lancamento"?"active":""}">Lançamento</button>
+      <button data-freqtab="fechamento" class="${freqTab==="fechamento"?"active":""}">Fechamento</button>
+    </div>
+    <div id="freq-content"></div>
+  `;
+  el.querySelectorAll("[data-freqtab]").forEach(b=>b.addEventListener("click", ()=>{ freqTab=b.dataset.freqtab; renderFrequencia(); }));
+
+  if(freqTab==="lancamento") renderFreqLancamentoTab();
+  else renderFreqFechamentoTab();
+}
+
+function renderFreqLancamentoTab(){
+  const wrap = document.getElementById("freq-content");
   const ativos = state.funcionarios.filter(f=>f.ativo!==false);
   const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
   if(!state.freqSel.obraId && obrasAtivas.length) state.freqSel.obraId = obrasAtivas[0].id;
@@ -837,15 +978,7 @@ function renderFrequencia(){
   const dt = new Date(dateISO + "T00:00:00");
   const dataFmt = dt.toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long", year:"numeric"});
 
-  el.innerHTML = `
-    <div class="page-head">
-      <div>
-        <span class="eyebrow">Escolha o dia e a obra</span>
-        <h2>Frequência</h2>
-        <p class="sub">Marque quem trabalhou em cada obra no dia. Um funcionário só pode estar em uma obra por dia.</p>
-      </div>
-    </div>
-
+  wrap.innerHTML = `
     <div class="card" style="margin-bottom:18px;padding:16px 20px;">
       <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;">
         <div class="field" style="max-width:190px;">
@@ -898,7 +1031,7 @@ function renderFrequencia(){
     state.freqSel.dateISO = dateStr(today.getFullYear(), today.getMonth()+1, today.getDate());
     renderFrequencia();
   });
-  el.querySelectorAll(".obra-chip").forEach(btn=>{
+  wrap.querySelectorAll(".obra-chip").forEach(btn=>{
     btn.addEventListener("click", ()=>{ state.freqSel.obraId = btn.dataset.obra; renderFrequencia(); });
   });
 
@@ -999,25 +1132,256 @@ function emptyStateCard(title, sub){
 }
 
 /* ============================================================
-   FECHAMENTO — grade funcionário × obra (equivalente à planilha)
+   QUENTINHAS — mesmo fluxo da Frequência (dia → obra → quem comeu),
+   numa coleção separada, para controle de custo e conferência
+   com a nota do fornecedor.
 ============================================================ */
-function renderFechamento(){
-  const el = document.getElementById("view-fechamento");
-  if(state.currentView !== "fechamento") return;
-  const calc = computeFechamento(state.period.year, state.period.month, state.period.tipo);
-  const obras = calc.obrasAtivas;
-  const funcs = calc.funcsAtivos;
+let quentTab = "lancamento";
+function renderQuentinhas(){
+  const el = document.getElementById("view-quentinhas");
+  if(state.currentView !== "quentinhas") return;
+  const valorUnit = Number(state.config.valorQuentinha)||0;
 
   el.innerHTML = `
     <div class="page-head">
       <div>
-        <span class="eyebrow">Grade de custo</span>
-        <h2>Fechamento</h2>
-        <p class="sub">${periodLabel(state.period.year, state.period.month, state.period.tipo)} — valor = dias trabalhados × diária</p>
+        <span class="eyebrow">${quentTab==="lancamento"?"Controle diário":"Para pagar o fornecedor"}</span>
+        <h2>Quentinhas</h2>
+        <p class="sub">${quentTab==="lancamento"
+          ? `Marque quem recebeu quentinha em cada obra no dia. Valor unitário: <b class="mono">${brl(valorUnit)}</b> ${valorUnit===0?'— <a href="#" id="link-config-valor" style="color:var(--amber-600);">defina em Cadastros → Config</a>':""}`
+          : "Feche por quinzena ou mês — mesma lógica do fechamento das obras."}</p>
       </div>
+    </div>
+    <div class="segmented" style="margin-bottom:18px;">
+      <button data-quenttab="lancamento" class="${quentTab==="lancamento"?"active":""}">Lançamento</button>
+      <button data-quenttab="fechamento" class="${quentTab==="fechamento"?"active":""}">Fechamento</button>
+    </div>
+    <div id="quent-content"></div>
+  `;
+  el.querySelectorAll("[data-quenttab]").forEach(b=>b.addEventListener("click", ()=>{ quentTab=b.dataset.quenttab; renderQuentinhas(); }));
+  document.getElementById("link-config-valor")?.addEventListener("click", e=>{ e.preventDefault(); cadTab="config"; setView("cadastro"); });
+
+  if(quentTab==="lancamento") renderQuentLancamentoTab();
+  else renderQuentFechamentoTab();
+}
+
+function renderQuentLancamentoTab(){
+  const wrap = document.getElementById("quent-content");
+  const ativos = state.funcionarios.filter(f=>f.ativo!==false);
+  const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
+  if(!state.quentSel.obraId && obrasAtivas.length) state.quentSel.obraId = obrasAtivas[0].id;
+  const { dateISO, obraId } = state.quentSel;
+  const obraAtual = obraById(obraId);
+  const dt = new Date(dateISO + "T00:00:00");
+  const dataFmt = dt.toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long", year:"numeric"});
+
+  wrap.innerHTML = `
+    <div class="card" style="margin-bottom:18px;padding:16px 20px;">
+      <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;">
+        <div class="field" style="max-width:190px;">
+          <label>Dia</label>
+          <input type="date" id="quent-date" value="${dateISO}">
+        </div>
+        <div class="field" style="flex:1;min-width:160px;">
+          <label style="text-transform:capitalize;">${dataFmt}</label>
+          <div class="segmented" style="width:100%;">
+            <button class="btn small" id="quent-day-prev" style="border-radius:6px 0 0 6px;">◂ dia anterior</button>
+            <button class="btn small" id="quent-day-today" style="border-radius:0;">hoje</button>
+            <button class="btn small" id="quent-day-next" style="border-radius:0 6px 6px 0;">próximo dia ▸</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${!ativos.length ? emptyStateCard("Sem funcionários", "Cadastre funcionários na aba Cadastros para começar.") :
+    !obrasAtivas.length ? emptyStateCard("Sem obras", "Cadastre ao menos uma obra na aba Cadastros para começar.") :
+    `<div class="grid-2" style="align-items:start;">
+      <div class="card">
+        <h3 style="font-size:14.5px;margin-bottom:10px;">1. Escolha a obra</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+          ${obrasAtivas.map(o=>`
+            <button class="obra-chip ${o.id===obraId?"active":""}" data-obra="${o.id}">
+              <span class="swatch ${obraColorClass(o.id)}"></span>${escapeHtml(o.sigla)}
+            </button>`).join("")}
+        </div>
+        <p style="font-size:12px;color:var(--steel-600);margin-top:10px;">${obraAtual?escapeHtml(obraAtual.nome):""}</p>
+
+        <h3 style="font-size:14.5px;margin:18px 0 8px;">2. Marque quem comeu aqui</h3>
+        <div id="quent-checklist"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:14.5px;margin-bottom:10px;">Resumo do dia</h3>
+        <div id="quent-day-summary"></div>
+      </div>
+    </div>`}
+  `;
+
+  if(!ativos.length || !obrasAtivas.length) return;
+
+  document.getElementById("quent-date").addEventListener("change", e=>{
+    if(e.target.value){ state.quentSel.dateISO = e.target.value; renderQuentinhas(); }
+  });
+  document.getElementById("quent-day-prev").addEventListener("click", ()=> shiftQuentDay(-1));
+  document.getElementById("quent-day-next").addEventListener("click", ()=> shiftQuentDay(1));
+  document.getElementById("quent-day-today").addEventListener("click", ()=>{
+    state.quentSel.dateISO = dateStr(today.getFullYear(), today.getMonth()+1, today.getDate());
+    renderQuentinhas();
+  });
+  wrap.querySelectorAll(".obra-chip").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ state.quentSel.obraId = btn.dataset.obra; renderQuentinhas(); });
+  });
+
+  renderQuentChecklist();
+  renderQuentDaySummary();
+}
+
+function renderQuentFechamentoTab(){
+  const wrap = document.getElementById("quent-content");
+  const { year, month, tipo } = state.period;
+  const r = computeQuentinhasPorObra(year, month, tipo);
+
+  wrap.innerHTML = `
+    <div class="toolbar" style="margin-bottom:0;">
+      <div class="spacer"></div>
+      <button class="btn small" id="btn-copiar-quent-fech">Copiar</button>
+      <button class="btn dark small" id="btn-export-quent-fech">Exportar CSV</button>
+    </div>
+    <div class="card" style="margin:14px 0 18px;padding:16px 20px;">${periodPickerHtml("quentfech")}</div>
+    <div class="card">
+      <p style="font-size:12.5px;color:var(--steel-600);margin-bottom:12px;">${periodLabel(year, month, tipo)}</p>
+      ${!r.linhas.length ? emptyState("Sem lançamentos", "Nenhuma quentinha registrada neste período.") : `
+      <table>
+        <thead><tr><th>Obra</th><th class="num-cell">Quantidade</th><th class="num-cell">Valor unit.</th><th class="num-cell">Total</th></tr></thead>
+        <tbody>
+          ${r.linhas.map(l=>`<tr>
+            <td><span class="tag ${obraColorClass(l.obra.id)}">${escapeHtml(l.obra.sigla)}</span> ${escapeHtml(l.obra.nome)}</td>
+            <td class="num-cell mono">${l.qtd}</td>
+            <td class="num-cell mono">${brl(r.valorUnit)}</td>
+            <td class="num-cell mono" style="font-weight:700;">${brl(l.valor)}</td>
+          </tr>`).join("")}
+          <tr class="total-row"><td>Total a pagar</td><td class="num-cell mono">${r.totalQtd}</td><td></td><td class="num-cell mono">${brl(r.totalValor)}</td></tr>
+        </tbody>
+      </table>`}
+    </div>
+  `;
+  bindPeriodPicker("quentfech", renderAll);
+
+  document.getElementById("btn-export-quent-fech").addEventListener("click", ()=>{
+    if(!r.linhas.length){ toast("Nada para exportar", "err"); return; }
+    const rows = [["Obra","Quantidade","Valor unitário","Total"]];
+    r.linhas.forEach(l=> rows.push([l.obra.nome, l.qtd, r.valorUnit.toFixed(2).replace(".",","), l.valor.toFixed(2).replace(".",",")]));
+    rows.push(["Total", r.totalQtd, "", r.totalValor.toFixed(2).replace(".",",")]);
+    downloadCsv(rows, `quentinhas_${periodFileTag()}.csv`);
+  });
+  document.getElementById("btn-copiar-quent-fech").addEventListener("click", ()=>{
+    if(!r.linhas.length){ toast("Nada para copiar", "err"); return; }
+    let txt = `Obra\tQuantidade\tValor unitário\tTotal\r\n`;
+    r.linhas.forEach(l=> txt += `${l.obra.nome}\t${l.qtd}\t${r.valorUnit.toFixed(2).replace(".",",")}\t${l.valor.toFixed(2).replace(".",",")}\r\n`);
+    txt += `Total\t${r.totalQtd}\t\t${r.totalValor.toFixed(2).replace(".",",")}\r\n`;
+    navigator.clipboard.writeText(txt).then(()=>toast("Tabela copiada", "ok"))
+      .catch(()=>toast("Não foi possível copiar automaticamente", "err"));
+  });
+}
+
+function shiftQuentDay(delta){
+  const d = new Date(state.quentSel.dateISO + "T00:00:00");
+  d.setDate(d.getDate()+delta);
+  state.quentSel.dateISO = dateStr(d.getFullYear(), d.getMonth()+1, d.getDate());
+  renderQuentinhas();
+}
+
+function renderQuentChecklist(){
+  const wrap = document.getElementById("quent-checklist");
+  if(!wrap) return;
+  const { dateISO, obraId } = state.quentSel;
+  const ativos = state.funcionarios.filter(f=>f.ativo!==false);
+  const doDia = state.quentinhas.filter(e=>e.data===dateISO);
+
+  wrap.innerHTML = ativos.map(f=>{
+    const entry = doDia.find(e=>e.funcionarioId===f.id);
+    const aqui = entry && entry.obraId === obraId;
+    const outraObra = entry && entry.obraId !== obraId ? obraById(entry.obraId) : null;
+    return `
+      <label class="check-row ${aqui?"checked":""}" data-func="${f.id}">
+        <input type="checkbox" ${aqui?"checked":""} data-func="${f.id}">
+        <div class="info">
+          <div class="name">${escapeHtml(f.nome)}</div>
+          <div class="meta">${escapeHtml(f.funcao||"—")}</div>
+        </div>
+        ${outraObra ? `<span class="tag ${obraColorClass(outraObra.id)}" title="Já lançado em outra obra hoje">${escapeHtml(outraObra.sigla)} hoje</span>` : ""}
+      </label>`;
+  }).join("");
+
+  wrap.querySelectorAll("input[type=checkbox]").forEach(cb=>{
+    cb.addEventListener("change", async ()=>{
+      const funcionarioId = cb.dataset.func;
+      const f = funcById(funcionarioId);
+      const entry = state.quentinhas.find(e=>e.data===dateISO && e.funcionarioId===funcionarioId);
+      if(cb.checked){
+        if(entry && entry.obraId !== obraId){
+          const deObra = obraById(entry.obraId);
+          cb.checked = false;
+          confirmModal(
+            `${escapeHtml(f.nome)} já está com quentinha lançada em <b>${deObra?escapeHtml(deObra.nome):"outra obra"}</b> neste dia. Mover para <b>${escapeHtml(obraById(obraId).nome)}</b>?`,
+            async ()=>{
+              try{ await setQuentinha(funcionarioId, dateISO, obraId); toast("Quentinha movida de obra", "ok"); }
+              catch(e){ console.error(e); toast("Erro ao salvar", "err"); }
+            }
+          );
+        }else{
+          try{ await setQuentinha(funcionarioId, dateISO, obraId); }
+          catch(e){ console.error(e); toast("Erro ao salvar. Verifique o Firebase.", "err"); cb.checked=false; }
+        }
+      }else{
+        try{ await setQuentinha(funcionarioId, dateISO, null); }
+        catch(e){ console.error(e); toast("Erro ao remover", "err"); cb.checked=true; }
+      }
+    });
+  });
+}
+
+function renderQuentDaySummary(){
+  const wrap = document.getElementById("quent-day-summary");
+  if(!wrap) return;
+  const { dateISO } = state.quentSel;
+  const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
+  const valorUnit = Number(state.config.valorQuentinha)||0;
+  const doDia = state.quentinhas.filter(e=>e.data===dateISO);
+  const totalDia = doDia.length * valorUnit;
+
+  wrap.innerHTML = obrasAtivas.map(o=>{
+    const gente = doDia.filter(e=>e.obraId===o.id).map(e=>funcById(e.funcionarioId)).filter(Boolean);
+    return `<div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">
+        <span class="tag ${obraColorClass(o.id)}">${escapeHtml(o.sigla)}</span>
+        <b style="font-size:13px;">${escapeHtml(o.nome)}</b>
+        <span style="color:var(--steel-600);font-size:12px;margin-left:auto;">${gente.length} · ${brl(gente.length*valorUnit)}</span>
+      </div>
+      ${gente.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${gente.map(f=>`<span class="pill">${escapeHtml(f.nome)}</span>`).join("")}</div>`
+        : `<p style="font-size:12.5px;color:var(--steel-600);margin:0;">Ninguém lançado ainda.</p>`}
+    </div>`;
+  }).join("") + `
+    <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:4px;display:flex;justify-content:space-between;font-weight:700;font-size:13.5px;">
+      <span>Total do dia</span><span class="mono">${doDia.length} quentinha${doDia.length===1?"":"s"} · ${brl(totalDia)}</span>
+    </div>`;
+}
+
+/* ============================================================
+   FECHAMENTO — grade funcionário × obra (equivalente à planilha)
+============================================================ */
+function renderFreqFechamentoTab(){
+  const wrap = document.getElementById("freq-content");
+  const calc = computeFechamento(state.period.year, state.period.month, state.period.tipo);
+  const obras = calc.obrasAtivas;
+  const funcs = calc.funcsAtivos;
+
+  wrap.innerHTML = `
+    <div class="toolbar" style="margin-bottom:0;">
+      <div class="spacer"></div>
       <button class="btn dark" id="btn-export-fechamento">Exportar CSV</button>
     </div>
-    <div class="card" style="margin-bottom:18px;padding:16px 20px;">${periodPickerHtml("fech")}</div>
+    <div class="card" style="margin:14px 0 18px;padding:16px 20px;">${periodPickerHtml("fech")}</div>
     <div class="card" style="overflow:auto;">
       ${!funcs.length || !obras.length ? emptyState("Sem dados", "Cadastre funcionários e obras, depois lance a frequência.") : `
       <table>
@@ -1195,6 +1559,175 @@ function vinculoCardHtml(titulo, grupo, key, semAcao){
 }
 
 /* ============================================================
+   RELATÓRIOS — para conferência e impressão
+============================================================ */
+function computeFolhaPorObra(obraId, year, month, tipo){
+  const {start,end} = periodRange(year, month, tipo);
+  const rows = [];
+  for(let d=start; d<=end; d++){
+    const iso = dateStr(year, month, d);
+    const pessoas = state.frequencia.filter(e=>e.obraId===obraId && e.data===iso)
+      .map(e=>funcById(e.funcionarioId)).filter(Boolean).sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR"));
+    rows.push({dia:d, iso, pessoas});
+  }
+  return rows;
+}
+function computeFolhaPorFuncionario(funcionarioId, year, month, tipo){
+  const {start,end} = periodRange(year, month, tipo);
+  const rows = [];
+  for(let d=start; d<=end; d++){
+    const iso = dateStr(year, month, d);
+    const entry = state.frequencia.find(e=>e.funcionarioId===funcionarioId && e.data===iso);
+    rows.push({dia:d, iso, obra: entry ? obraById(entry.obraId) : null});
+  }
+  return rows;
+}
+function computeQuentinhasPorObra(year, month, tipo){
+  const {start,end} = periodRange(year, month, tipo);
+  const valorUnit = Number(state.config.valorQuentinha)||0;
+  const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
+  const entries = state.quentinhas.filter(e=>{
+    const d = new Date(e.data+"T00:00:00");
+    return d.getFullYear()===year && (d.getMonth()+1)===month && d.getDate()>=start && d.getDate()<=end;
+  });
+  const porObra = {};
+  entries.forEach(e=>{
+    const o = obraById(e.obraId);
+    if(!o) return;
+    porObra[o.id] = (porObra[o.id]||0)+1;
+  });
+  const linhas = obrasAtivas.map(o=>({obra:o, qtd:porObra[o.id]||0, valor:(porObra[o.id]||0)*valorUnit}))
+    .filter(l=>l.qtd>0).sort((a,b)=>b.qtd-a.qtd);
+  const totalQtd = linhas.reduce((s,l)=>s+l.qtd,0);
+  return { linhas, totalQtd, totalValor: totalQtd*valorUnit, valorUnit };
+}
+
+const REL_TIPOS = {
+  fechamento: "Fechamento (funcionário × obra)",
+  rateio: "Rateio por peso (Sienge)",
+  "folha-obra": "Folha de frequência por obra",
+  "folha-func": "Folha de ponto individual",
+  quentinhas: "Quentinhas por obra"
+};
+
+function renderRelatorios(){
+  const el = document.getElementById("view-relatorios");
+  if(state.currentView !== "relatorios") return;
+  const { year, month, tipo } = state.period;
+  const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
+  const ativos = state.funcionarios.filter(f=>f.ativo!==false);
+  if(!state.relSel.obraId && obrasAtivas.length) state.relSel.obraId = obrasAtivas[0].id;
+  if(!state.relSel.funcionarioId && ativos.length) state.relSel.funcionarioId = ativos[0].id;
+  const relTipo = state.relSel.tipo;
+
+  el.innerHTML = `
+    <div class="page-head">
+      <div>
+        <span class="eyebrow">Para conferência</span>
+        <h2>Relatórios</h2>
+        <p class="sub">Escolha o relatório, ajuste os filtros e imprima ou salve como PDF.</p>
+      </div>
+      <button class="btn dark" id="btn-imprimir-rel">Imprimir</button>
+    </div>
+    <div class="card" style="margin-bottom:18px;padding:16px 20px;">
+      <div class="field" style="max-width:340px;margin-bottom:14px;">
+        <label>Relatório</label>
+        <select id="rel-report-tipo">
+          ${Object.entries(REL_TIPOS).map(([k,v])=>`<option value="${k}" ${relTipo===k?"selected":""}>${v}</option>`).join("")}
+        </select>
+      </div>
+      ${periodPickerHtml("rel")}
+      ${relTipo==="folha-obra" ? `<div class="field" style="max-width:280px;margin-top:12px;">
+        <label>Obra</label>
+        <select id="rel-obra">${obrasAtivas.map(o=>`<option value="${o.id}" ${state.relSel.obraId===o.id?"selected":""}>${escapeHtml(o.sigla)} — ${escapeHtml(o.nome)}</option>`).join("")}</select>
+      </div>` : ""}
+      ${relTipo==="folha-func" ? `<div class="field" style="max-width:280px;margin-top:12px;">
+        <label>Funcionário</label>
+        <select id="rel-func">${ativos.map(f=>`<option value="${f.id}" ${state.relSel.funcionarioId===f.id?"selected":""}>${escapeHtml(f.nome)}</option>`).join("")}</select>
+      </div>` : ""}
+    </div>
+
+    <div class="card" id="rel-preview"></div>
+    <div class="print-area" id="rel-print-area"></div>
+  `;
+  bindPeriodPicker("rel", renderAll);
+  document.getElementById("rel-report-tipo").addEventListener("change", e=>{ state.relSel.tipo = e.target.value; renderRelatorios(); });
+  document.getElementById("rel-obra")?.addEventListener("change", e=>{ state.relSel.obraId = e.target.value; renderRelatorios(); });
+  document.getElementById("rel-func")?.addEventListener("change", e=>{ state.relSel.funcionarioId = e.target.value; renderRelatorios(); });
+  document.getElementById("btn-imprimir-rel").addEventListener("click", ()=> window.print());
+
+  const conteudo = buildRelatorioConteudo(relTipo, year, month, tipo);
+  document.getElementById("rel-preview").innerHTML = conteudo;
+  document.getElementById("rel-print-area").innerHTML = `
+    <div class="print-head">
+      ${LOGO_DATA_URI ? `<img class="print-logo" src="${LOGO_DATA_URI}">` : ""}
+      <h2 style="margin:0;">${REL_TIPOS[relTipo]}</h2>
+      <p style="margin:4px 0 0;font-size:13px;">${periodLabel(year, month, tipo)}</p>
+    </div>
+    ${conteudo}
+  `;
+}
+
+function buildRelatorioConteudo(relTipo, year, month, tipo){
+  if(relTipo === "fechamento"){
+    const calc = computeFechamento(year, month, tipo);
+    const obras = calc.obrasAtivas, funcs = calc.funcsAtivos;
+    if(!funcs.length || !obras.length) return emptyState("Sem dados", "Cadastre funcionários e obras, depois lance a frequência.");
+    return `<table>
+      <thead><tr><th>Funcionário</th><th>Vínculo</th>${obras.map(o=>`<th class="num-cell">${escapeHtml(o.sigla)}</th>`).join("")}<th class="num-cell">Total</th></tr></thead>
+      <tbody>
+        ${funcs.map(f=>`<tr><td>${escapeHtml(f.nome)}</td><td>${escapeHtml(f.vinculo||"—")}</td>
+          ${obras.map(o=>{ const cell=(calc.matrix[f.id]&&calc.matrix[f.id][o.id])||{dias:0,valor:0}; return `<td class="num-cell mono">${cell.dias?brl(cell.valor):"—"}</td>`; }).join("")}
+          <td class="num-cell mono" style="font-weight:700;">${brl(calc.totalPorFuncionario[f.id]||0)}</td></tr>`).join("")}
+        <tr class="total-row"><td colspan="2">Total por obra</td>${obras.map(o=>`<td class="num-cell mono">${brl(calc.totalPorObra[o.id]||0)}</td>`).join("")}<td class="num-cell mono">${brl(calc.grandTotalValor)}</td></tr>
+      </tbody>
+    </table>`;
+  }
+  if(relTipo === "rateio"){
+    const vinc = computeRateioPorVinculo(year, month, tipo);
+    const bloco = (titulo, grupo)=> !grupo.linhas.length ? "" : `
+      <h3 style="font-size:14px;margin:16px 0 8px;">${titulo}</h3>
+      <table><thead><tr><th>Obra</th><th class="num-cell">Custo</th><th class="num-cell">Peso</th></tr></thead><tbody>
+        ${grupo.linhas.map(l=>`<tr><td>${escapeHtml(l.obra.sigla)} — ${escapeHtml(l.obra.nome)}</td><td class="num-cell mono">${brl(l.valor)}</td><td class="num-cell mono">${pct(l.peso)}</td></tr>`).join("")}
+        <tr class="total-row"><td>Total</td><td class="num-cell mono">${brl(grupo.total)}</td><td class="num-cell mono">100,0%</td></tr>
+      </tbody></table>`;
+    const html = bloco("Avulsos", vinc.avulso) + bloco("Contratados", vinc.contratado) + bloco("Outros", vinc.outros);
+    return html || emptyState("Nada a ratear", "Nenhum lançamento neste período.");
+  }
+  if(relTipo === "folha-obra"){
+    const obra = obraById(state.relSel.obraId);
+    if(!obra) return emptyState("Sem obra", "Cadastre uma obra primeiro.");
+    const rows = computeFolhaPorObra(obra.id, year, month, tipo);
+    return `<p style="font-size:13px;margin-bottom:12px;"><b>${escapeHtml(obra.nome)}</b> (${escapeHtml(obra.sigla)})</p>
+      <table><thead><tr><th style="width:90px;">Dia</th><th>Quem trabalhou</th><th style="width:130px;">Confirmação</th></tr></thead><tbody>
+        ${rows.map(r=>`<tr><td class="mono">${formatDateBr(r.iso)}</td><td>${r.pessoas.length? r.pessoas.map(p=>escapeHtml(p.nome)).join(", ") : '<span style="color:var(--steel-600);">—</span>'}</td><td></td></tr>`).join("")}
+      </tbody></table>`;
+  }
+  if(relTipo === "folha-func"){
+    const f = funcById(state.relSel.funcionarioId);
+    if(!f) return emptyState("Sem funcionário", "Cadastre um funcionário primeiro.");
+    const rows = computeFolhaPorFuncionario(f.id, year, month, tipo);
+    const totalDias = rows.filter(r=>r.obra).length;
+    return `<p style="font-size:13px;margin-bottom:12px;"><b>${escapeHtml(f.nome)}</b> — ${escapeHtml(f.funcao||"—")} · ${escapeHtml(f.vinculo||"—")}</p>
+      <table><thead><tr><th style="width:90px;">Dia</th><th>Obra</th></tr></thead><tbody>
+        ${rows.map(r=>`<tr><td class="mono">${formatDateBr(r.iso)}</td><td>${r.obra? escapeHtml(r.obra.sigla)+" — "+escapeHtml(r.obra.nome) : '<span style="color:var(--steel-600);">sem lançamento</span>'}</td></tr>`).join("")}
+        <tr class="total-row"><td>Total</td><td>${totalDias} dia${totalDias===1?"":"s"} trabalhado${totalDias===1?"":"s"}</td></tr>
+      </tbody></table>
+      <p style="margin-top:36px;font-size:12.5px;">Confirmo que os lançamentos acima correspondem aos dias e obras trabalhados.</p>
+      <p style="margin-top:34px;font-size:12.5px;">Assinatura: ______________________________________</p>`;
+  }
+  if(relTipo === "quentinhas"){
+    const r = computeQuentinhasPorObra(year, month, tipo);
+    if(!r.linhas.length) return emptyState("Sem lançamentos", "Nenhuma quentinha registrada neste período.");
+    return `<table><thead><tr><th>Obra</th><th class="num-cell">Quantidade</th><th class="num-cell">Valor unit.</th><th class="num-cell">Total</th></tr></thead><tbody>
+      ${r.linhas.map(l=>`<tr><td>${escapeHtml(l.obra.sigla)} — ${escapeHtml(l.obra.nome)}</td><td class="num-cell mono">${l.qtd}</td><td class="num-cell mono">${brl(r.valorUnit)}</td><td class="num-cell mono">${brl(l.valor)}</td></tr>`).join("")}
+      <tr class="total-row"><td>Total</td><td class="num-cell mono">${r.totalQtd}</td><td></td><td class="num-cell mono">${brl(r.totalValor)}</td></tr>
+    </tbody></table>`;
+  }
+  return "";
+}
+
+/* ============================================================
    OBSERVAÇÕES — ocorrências do dia a dia, com impressão
 ============================================================ */
 const obsFiltro = { inicio: null, fim: null };
@@ -1249,7 +1782,7 @@ function renderObservacoes(){
       </div>
     </div>
 
-    <div id="print-area">
+    <div id="print-area" class="print-area">
       <div class="print-head">
         ${LOGO_DATA_URI ? `<img class="print-logo" src="${LOGO_DATA_URI}">` : ""}
         <h2 style="margin:0;">Observações — ${formatDateBr(obsFiltro.inicio)} a ${formatDateBr(obsFiltro.fim)}</h2>
@@ -1317,20 +1850,42 @@ function renderCadastro(){
       <div>
         <span class="eyebrow">Base de dados</span>
         <h2>Cadastros</h2>
-        <p class="sub">Funcionários, vínculo, valor da diária e obras ativas.</p>
+        <p class="sub">Funcionários, vínculo, valor da diária, obras ativas e configurações gerais.</p>
       </div>
     </div>
     <div class="segmented" style="margin-bottom:18px;">
       <button data-tab="funcionarios" class="${cadTab==="funcionarios"?"active":""}">Funcionários</button>
       <button data-tab="obras" class="${cadTab==="obras"?"active":""}">Obras</button>
+      <button data-tab="config" class="${cadTab==="config"?"active":""}">Config</button>
     </div>
-    <div class="grid-2" style="align-items:start;">
-      <div class="card" id="cad-form-wrap"></div>
-      <div class="card" id="cad-list-wrap"></div>
-    </div>
+    ${cadTab==="config" ? `<div class="card" style="max-width:420px;" id="cad-config-wrap"></div>` :
+      `<div class="grid-2" style="align-items:start;">
+        <div class="card" id="cad-form-wrap"></div>
+        <div class="card" id="cad-list-wrap"></div>
+      </div>`}
   `;
   el.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click", ()=>{ cadTab=b.dataset.tab; renderCadastro(); }));
-  if(cadTab==="funcionarios") renderFuncionarioTab(); else renderObraTab();
+  if(cadTab==="funcionarios") renderFuncionarioTab();
+  else if(cadTab==="obras") renderObraTab();
+  else renderConfigTab();
+}
+
+function renderConfigTab(){
+  const wrap = document.getElementById("cad-config-wrap");
+  wrap.innerHTML = `
+    <h3 style="font-size:14.5px;margin-bottom:6px;">Valor da quentinha</h3>
+    <p style="font-size:12.5px;color:var(--steel-600);margin:0 0 14px;">Valor único usado para calcular o custo das quentinhas por obra e por período.</p>
+    <form id="form-config">
+      <div class="field"><label>Valor unitário (R$)</label><input id="cfg-valor-quentinha" type="number" min="0" step="0.01" value="${state.config.valorQuentinha||""}" placeholder="ex: 18.00"></div>
+      <button class="btn dark" type="submit" style="width:100%;">Salvar</button>
+    </form>
+  `;
+  document.getElementById("form-config").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const valor = Number(document.getElementById("cfg-valor-quentinha").value)||0;
+    try{ await saveConfig({ valorQuentinha: valor }); toast("Configuração salva", "ok"); }
+    catch(err){ console.error(err); toast("Erro ao salvar. Verifique o Firebase.", "err"); }
+  });
 }
 
 function renderFuncionarioTab(){
@@ -1459,9 +2014,10 @@ function renderAll(){
   if(!state.user) return;
   renderDashboard();
   renderFrequencia();
-  renderFechamento();
+  renderQuentinhas();
   renderRateio();
   renderObservacoes();
+  renderRelatorios();
   renderCadastro();
 }
 
