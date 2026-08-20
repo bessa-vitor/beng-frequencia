@@ -1888,19 +1888,27 @@ function renderConfigTab(){
   });
 }
 
+let editingFuncId = null;
 function renderFuncionarioTab(){
+  const f = editingFuncId ? funcById(editingFuncId) : null;
   document.getElementById("cad-form-wrap").innerHTML = `
-    <h3 style="font-size:14.5px;margin-bottom:14px;">Novo funcionário</h3>
+    <h3 style="font-size:14.5px;margin-bottom:14px;">${f ? "Editar funcionário" : "Novo funcionário"}</h3>
     <form id="form-func">
-      <div class="field"><label>Nome</label><input required id="ff-nome" placeholder="ex: José Carlos"></div>
+      <div class="field"><label>Nome</label><input required id="ff-nome" placeholder="ex: José Carlos" value="${f?escapeHtml(f.nome):""}"></div>
       <div class="field-row">
-        <div class="field"><label>Função</label><input id="ff-funcao" placeholder="ex: Pedreiro, Servente..."></div>
+        <div class="field"><label>Função</label><input id="ff-funcao" placeholder="ex: Pedreiro, Servente..." value="${f?escapeHtml(f.funcao||""):""}"></div>
         <div class="field"><label>Vínculo</label>
-          <select id="ff-vinculo"><option value="AVULSO">Avulso</option><option value="CONTRATADO">Contratado</option></select>
+          <select id="ff-vinculo">
+            <option value="AVULSO" ${f&&f.vinculo==="AVULSO"?"selected":""}>Avulso</option>
+            <option value="CONTRATADO" ${f&&f.vinculo==="CONTRATADO"?"selected":""}>Contratado</option>
+          </select>
         </div>
       </div>
-      <div class="field"><label>Valor da diária (R$)</label><input required id="ff-diaria" type="number" min="0" step="0.01" placeholder="180.00"></div>
-      <button class="btn dark" type="submit" style="width:100%;">Adicionar funcionário</button>
+      <div class="field"><label>Valor da diária (R$)</label><input required id="ff-diaria" type="number" min="0" step="0.01" placeholder="180.00" value="${f?f.valorDiaria:""}"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn dark" type="submit" style="flex:1;">${f ? "Salvar alterações" : "Adicionar funcionário"}</button>
+        ${f ? `<button class="btn" type="button" id="btn-cancelar-edicao-func">Cancelar</button>` : ""}
+      </div>
     </form>
   `;
   document.getElementById("form-func").addEventListener("submit", async e=>{
@@ -1909,32 +1917,44 @@ function renderFuncionarioTab(){
       nome: document.getElementById("ff-nome").value.trim(),
       funcao: document.getElementById("ff-funcao").value.trim(),
       vinculo: document.getElementById("ff-vinculo").value,
-      valorDiaria: Number(document.getElementById("ff-diaria").value)||0,
-      ativo: true
+      valorDiaria: Number(document.getElementById("ff-diaria").value)||0
     };
     if(!data.nome) return;
-    try{ await saveFuncionario(data); toast("Funcionário adicionado", "ok"); e.target.reset(); }
+    if(!editingFuncId) data.ativo = true;
+    try{
+      await saveFuncionario(data, editingFuncId || undefined);
+      toast(editingFuncId ? "Alterações salvas" : "Funcionário adicionado", "ok");
+      editingFuncId = null;
+      renderFuncionarioTab();
+    }
     catch(err){ console.error(err); toast("Erro ao salvar. Verifique a configuração do Firebase.", "err"); }
   });
+  document.getElementById("btn-cancelar-edicao-func")?.addEventListener("click", ()=>{ editingFuncId = null; renderFuncionarioTab(); });
 
   const wrap = document.getElementById("cad-list-wrap");
   wrap.innerHTML = `<h3 style="font-size:14.5px;margin-bottom:8px;">Equipe (${state.funcionarios.length})</h3>` +
-    (state.funcionarios.length ? state.funcionarios.map(f=>`
+    (state.funcionarios.length ? state.funcionarios.map(fu=>`
       <div class="list-row">
         <div class="info">
-          <div class="name">${escapeHtml(f.nome)}</div>
-          <div class="meta">${escapeHtml(f.funcao||"—")} · ${escapeHtml(f.vinculo||"—")} · ${brl(f.valorDiaria)}/dia</div>
+          <div class="name">${escapeHtml(fu.nome)}</div>
+          <div class="meta">${escapeHtml(fu.funcao||"—")} · ${escapeHtml(fu.vinculo||"—")} · ${brl(fu.valorDiaria)}/dia</div>
         </div>
-        <span class="pill ${f.ativo!==false?"on":"off"}">${f.ativo!==false?"ativo":"inativo"}</span>
+        <span class="pill ${fu.ativo!==false?"on":"off"}">${fu.ativo!==false?"ativo":"inativo"}</span>
         <div class="actions">
-          <button class="btn small" data-toggle="${f.id}">${f.ativo!==false?"Desativar":"Ativar"}</button>
-          <button class="btn small danger" data-del="${f.id}">Excluir</button>
+          <button class="btn small" data-edit="${fu.id}">Editar</button>
+          <button class="btn small" data-toggle="${fu.id}">${fu.ativo!==false?"Desativar":"Ativar"}</button>
+          <button class="btn small danger" data-del="${fu.id}">Excluir</button>
         </div>
       </div>`).join("") : emptyState("Nenhum funcionário", "Adicione o primeiro ao lado."));
 
+  wrap.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", ()=>{
+    editingFuncId = b.dataset.edit;
+    renderFuncionarioTab();
+    document.getElementById("cad-form-wrap").scrollIntoView({behavior:"smooth", block:"start"});
+  }));
   wrap.querySelectorAll("[data-toggle]").forEach(b=>b.addEventListener("click", async ()=>{
-    const f = funcById(b.dataset.toggle);
-    try{ await saveFuncionario({ativo: f.ativo===false}, f.id); }catch(e){ toast("Erro ao atualizar", "err"); }
+    const fu = funcById(b.dataset.toggle);
+    try{ await saveFuncionario({ativo: fu.ativo===false}, fu.id); }catch(e){ toast("Erro ao atualizar", "err"); }
   }));
   wrap.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click", ()=>{
     const id = b.dataset.del;
@@ -1946,43 +1966,60 @@ function renderFuncionarioTab(){
   }));
 }
 
+let editingObraId = null;
 function renderObraTab(){
+  const o = editingObraId ? obraById(editingObraId) : null;
   document.getElementById("cad-form-wrap").innerHTML = `
-    <h3 style="font-size:14.5px;margin-bottom:14px;">Nova obra</h3>
+    <h3 style="font-size:14.5px;margin-bottom:14px;">${o ? "Editar obra" : "Nova obra"}</h3>
     <form id="form-obra">
-      <div class="field"><label>Nome da obra</label><input required id="fo-nome" placeholder="ex: Residencial Alameda"></div>
-      <div class="field"><label>Sigla (até 3 letras)</label><input required id="fo-sigla" maxlength="3" placeholder="ex: RAL" style="text-transform:uppercase"></div>
-      <button class="btn dark" type="submit" style="width:100%;">Adicionar obra</button>
+      <div class="field"><label>Nome da obra</label><input required id="fo-nome" placeholder="ex: Residencial Alameda" value="${o?escapeHtml(o.nome):""}"></div>
+      <div class="field"><label>Sigla (até 3 letras)</label><input required id="fo-sigla" maxlength="3" placeholder="ex: RAL" style="text-transform:uppercase" value="${o?escapeHtml(o.sigla):""}"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn dark" type="submit" style="flex:1;">${o ? "Salvar alterações" : "Adicionar obra"}</button>
+        ${o ? `<button class="btn" type="button" id="btn-cancelar-edicao-obra">Cancelar</button>` : ""}
+      </div>
     </form>
   `;
   document.getElementById("form-obra").addEventListener("submit", async e=>{
     e.preventDefault();
     const data = {
       nome: document.getElementById("fo-nome").value.trim(),
-      sigla: document.getElementById("fo-sigla").value.trim().toUpperCase().slice(0,3),
-      ativo: true
+      sigla: document.getElementById("fo-sigla").value.trim().toUpperCase().slice(0,3)
     };
     if(!data.nome || !data.sigla) return;
-    try{ await saveObra(data); toast("Obra adicionada", "ok"); e.target.reset(); }
+    if(!editingObraId) data.ativo = true;
+    try{
+      await saveObra(data, editingObraId || undefined);
+      toast(editingObraId ? "Alterações salvas" : "Obra adicionada", "ok");
+      editingObraId = null;
+      renderObraTab();
+    }
     catch(err){ console.error(err); toast("Erro ao salvar. Verifique a configuração do Firebase.", "err"); }
   });
+  document.getElementById("btn-cancelar-edicao-obra")?.addEventListener("click", ()=>{ editingObraId = null; renderObraTab(); });
 
   const wrap = document.getElementById("cad-list-wrap");
   wrap.innerHTML = `<h3 style="font-size:14.5px;margin-bottom:8px;">Obras (${state.obras.length})</h3>` +
-    (state.obras.length ? state.obras.map(o=>`
+    (state.obras.length ? state.obras.map(ob=>`
       <div class="list-row">
-        <span class="tag ${obraColorClass(o.id)}">${escapeHtml(o.sigla)}</span>
-        <div class="info"><div class="name">${escapeHtml(o.nome)}</div></div>
-        <span class="pill ${o.ativo!==false?"on":"off"}">${o.ativo!==false?"ativa":"inativa"}</span>
+        <span class="tag ${obraColorClass(ob.id)}">${escapeHtml(ob.sigla)}</span>
+        <div class="info"><div class="name">${escapeHtml(ob.nome)}</div></div>
+        <span class="pill ${ob.ativo!==false?"on":"off"}">${ob.ativo!==false?"ativa":"inativa"}</span>
         <div class="actions">
-          <button class="btn small" data-toggle="${o.id}">${o.ativo!==false?"Desativar":"Ativar"}</button>
-          <button class="btn small danger" data-del="${o.id}">Excluir</button>
+          <button class="btn small" data-edit="${ob.id}">Editar</button>
+          <button class="btn small" data-toggle="${ob.id}">${ob.ativo!==false?"Desativar":"Ativar"}</button>
+          <button class="btn small danger" data-del="${ob.id}">Excluir</button>
         </div>
       </div>`).join("") : emptyState("Nenhuma obra", "Adicione a primeira ao lado."));
 
+  wrap.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", ()=>{
+    editingObraId = b.dataset.edit;
+    renderObraTab();
+    document.getElementById("cad-form-wrap").scrollIntoView({behavior:"smooth", block:"start"});
+  }));
   wrap.querySelectorAll("[data-toggle]").forEach(b=>b.addEventListener("click", async ()=>{
-    const o = obraById(b.dataset.toggle);
-    try{ await saveObra({ativo: o.ativo===false}, o.id); }catch(e){ toast("Erro ao atualizar", "err"); }
+    const ob = obraById(b.dataset.toggle);
+    try{ await saveObra({ativo: ob.ativo===false}, ob.id); }catch(e){ toast("Erro ao atualizar", "err"); }
   }));
   wrap.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click", ()=>{
     const id = b.dataset.del;
