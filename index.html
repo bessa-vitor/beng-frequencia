@@ -243,6 +243,21 @@
   .check-row .info .meta{font-size:11.5px;color:var(--steel-600);}
   .check-row.checked{background:var(--moss-100);}
 
+  /* ---------- Quentinhas por obra (quantitativo) ---------- */
+  .quent-obra-row{
+    display:flex;align-items:center;gap:12px;padding:12px 6px;border-bottom:1px solid var(--paper-100);flex-wrap:wrap;
+  }
+  .quent-obra-row:last-child{border-bottom:none;}
+  .qor-info{display:flex;align-items:center;gap:8px;flex:1;min-width:140px;font-size:13.5px;font-weight:600;}
+  .qor-stepper{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .qor-stepper .btn{padding:4px 11px;font-size:15px;line-height:1;}
+  .qor-input{
+    width:56px;text-align:center;padding:6px 4px;border:1px solid var(--line);border-radius:var(--radius-s);
+    font-size:14px;font-family:var(--font-mono);-moz-appearance:textfield;
+  }
+  .qor-input::-webkit-outer-spin-button, .qor-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .qor-valor{width:84px;text-align:right;font-size:13px;color:var(--steel-600);flex-shrink:0;}
+
   /* ---------- Observações / impressão ---------- */
   .obs-item{padding:12px 4px;border-bottom:1px solid var(--paper-100);}
   .obs-item:last-child{border-bottom:none;}
@@ -707,10 +722,10 @@ async function saveObservacao(data){
 }
 async function removeObservacao(id){ await deleteDoc(doc(db,"observacoes",id)); }
 
-async function setQuentinha(funcionarioId, dataISO, obraId){
-  const id = funcionarioId + "_" + dataISO;
-  if(!obraId){ await deleteDoc(doc(db,"quentinhas",id)); return; }
-  await setDoc(doc(db,"quentinhas",id), { funcionarioId, obraId, data: dataISO });
+async function setQuantidadeQuentinha(obraId, dataISO, quantidade){
+  const id = obraId + "_" + dataISO;
+  if(!quantidade || quantidade<=0){ await deleteDoc(doc(db,"quentinhas",id)); return; }
+  await setDoc(doc(db,"quentinhas",id), { obraId, data: dataISO, quantidade });
 }
 async function saveConfig(data){
   await setDoc(doc(db,"config","geral"), data, {merge:true});
@@ -1148,7 +1163,7 @@ function renderQuentinhas(){
         <span class="eyebrow">${quentTab==="lancamento"?"Controle diário":"Para pagar o fornecedor"}</span>
         <h2>Quentinhas</h2>
         <p class="sub">${quentTab==="lancamento"
-          ? `Marque quem recebeu quentinha em cada obra no dia. Valor unitário: <b class="mono">${brl(valorUnit)}</b> ${valorUnit===0?'— <a href="#" id="link-config-valor" style="color:var(--amber-600);">defina em Cadastros → Config</a>':""}`
+          ? `Informe quantas quentinhas foram consumidas em cada obra no dia (inclui terceirizados, sem precisar cadastrar ninguém). Valor unitário: <b class="mono">${brl(valorUnit)}</b> ${valorUnit===0?'— <a href="#" id="link-config-valor" style="color:var(--amber-600);">defina em Cadastros → Config</a>':""}`
           : "Feche por quinzena ou mês — mesma lógica do fechamento das obras."}</p>
       </div>
     </div>
@@ -1167,11 +1182,8 @@ function renderQuentinhas(){
 
 function renderQuentLancamentoTab(){
   const wrap = document.getElementById("quent-content");
-  const ativos = state.funcionarios.filter(f=>f.ativo!==false);
   const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
-  if(!state.quentSel.obraId && obrasAtivas.length) state.quentSel.obraId = obrasAtivas[0].id;
-  const { dateISO, obraId } = state.quentSel;
-  const obraAtual = obraById(obraId);
+  const { dateISO } = state.quentSel;
   const dt = new Date(dateISO + "T00:00:00");
   const dataFmt = dt.toLocaleDateString("pt-BR", {weekday:"long", day:"2-digit", month:"long", year:"numeric"});
 
@@ -1193,21 +1205,11 @@ function renderQuentLancamentoTab(){
       </div>
     </div>
 
-    ${!ativos.length ? emptyStateCard("Sem funcionários", "Cadastre funcionários na aba Cadastros para começar.") :
-    !obrasAtivas.length ? emptyStateCard("Sem obras", "Cadastre ao menos uma obra na aba Cadastros para começar.") :
+    ${!obrasAtivas.length ? emptyStateCard("Sem obras", "Cadastre ao menos uma obra na aba Cadastros para começar.") :
     `<div class="grid-2" style="align-items:start;">
       <div class="card">
-        <h3 style="font-size:14.5px;margin-bottom:10px;">1. Escolha a obra</h3>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
-          ${obrasAtivas.map(o=>`
-            <button class="obra-chip ${o.id===obraId?"active":""}" data-obra="${o.id}">
-              <span class="swatch ${obraColorClass(o.id)}"></span>${escapeHtml(o.sigla)}
-            </button>`).join("")}
-        </div>
-        <p style="font-size:12px;color:var(--steel-600);margin-top:10px;">${obraAtual?escapeHtml(obraAtual.nome):""}</p>
-
-        <h3 style="font-size:14.5px;margin:18px 0 8px;">2. Marque quem comeu aqui</h3>
-        <div id="quent-checklist"></div>
+        <h3 style="font-size:14.5px;margin-bottom:12px;">Quantidade por obra</h3>
+        <div id="quent-obra-list"></div>
       </div>
 
       <div class="card">
@@ -1217,7 +1219,7 @@ function renderQuentLancamentoTab(){
     </div>`}
   `;
 
-  if(!ativos.length || !obrasAtivas.length) return;
+  if(!obrasAtivas.length) return;
 
   document.getElementById("quent-date").addEventListener("change", e=>{
     if(e.target.value){ state.quentSel.dateISO = e.target.value; renderQuentinhas(); }
@@ -1228,12 +1230,50 @@ function renderQuentLancamentoTab(){
     state.quentSel.dateISO = dateStr(today.getFullYear(), today.getMonth()+1, today.getDate());
     renderQuentinhas();
   });
-  wrap.querySelectorAll(".obra-chip").forEach(btn=>{
-    btn.addEventListener("click", ()=>{ state.quentSel.obraId = btn.dataset.obra; renderQuentinhas(); });
-  });
 
-  renderQuentChecklist();
+  renderQuentObraList();
   renderQuentDaySummary();
+}
+
+function renderQuentObraList(){
+  const wrap = document.getElementById("quent-obra-list");
+  if(!wrap) return;
+  const { dateISO } = state.quentSel;
+  const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
+  const valorUnit = Number(state.config.valorQuentinha)||0;
+
+  wrap.innerHTML = obrasAtivas.map(o=>{
+    const entry = state.quentinhas.find(e=>e.obraId===o.id && e.data===dateISO);
+    const qtd = entry ? Number(entry.quantidade)||0 : 0;
+    return `<div class="quent-obra-row" data-obra="${o.id}">
+      <div class="qor-info">
+        <span class="tag ${obraColorClass(o.id)}">${escapeHtml(o.sigla)}</span>
+        <span class="qor-nome">${escapeHtml(o.nome)}</span>
+      </div>
+      <div class="qor-stepper">
+        <button class="btn small" type="button" data-step="-1">−</button>
+        <input type="number" min="0" step="1" inputmode="numeric" class="qor-input" value="${qtd||""}" placeholder="0">
+        <button class="btn small" type="button" data-step="1">+</button>
+      </div>
+      <span class="qor-valor mono">${brl(qtd*valorUnit)}</span>
+    </div>`;
+  }).join("");
+
+  wrap.querySelectorAll(".quent-obra-row").forEach(row=>{
+    const obraId = row.dataset.obra;
+    const input = row.querySelector(".qor-input");
+    const valorEl = row.querySelector(".qor-valor");
+    const commit = async (newVal)=>{
+      newVal = Math.max(0, Math.round(newVal)||0);
+      input.value = newVal || "";
+      valorEl.textContent = brl(newVal*valorUnit);
+      try{ await setQuantidadeQuentinha(obraId, dateISO, newVal); }
+      catch(e){ console.error(e); toast("Erro ao salvar. Verifique o Firebase.", "err"); }
+    };
+    row.querySelector('[data-step="-1"]').addEventListener("click", ()=> commit((Number(input.value)||0)-1));
+    row.querySelector('[data-step="1"]').addEventListener("click", ()=> commit((Number(input.value)||0)+1));
+    input.addEventListener("change", ()=> commit(Number(input.value)||0));
+  });
 }
 
 function renderQuentFechamentoTab(){
@@ -1291,79 +1331,28 @@ function shiftQuentDay(delta){
   renderQuentinhas();
 }
 
-function renderQuentChecklist(){
-  const wrap = document.getElementById("quent-checklist");
-  if(!wrap) return;
-  const { dateISO, obraId } = state.quentSel;
-  const ativos = state.funcionarios.filter(f=>f.ativo!==false);
-  const doDia = state.quentinhas.filter(e=>e.data===dateISO);
-
-  wrap.innerHTML = ativos.map(f=>{
-    const entry = doDia.find(e=>e.funcionarioId===f.id);
-    const aqui = entry && entry.obraId === obraId;
-    const outraObra = entry && entry.obraId !== obraId ? obraById(entry.obraId) : null;
-    return `
-      <label class="check-row ${aqui?"checked":""}" data-func="${f.id}">
-        <input type="checkbox" ${aqui?"checked":""} data-func="${f.id}">
-        <div class="info">
-          <div class="name">${escapeHtml(f.nome)}</div>
-          <div class="meta">${escapeHtml(f.funcao||"—")}</div>
-        </div>
-        ${outraObra ? `<span class="tag ${obraColorClass(outraObra.id)}" title="Já lançado em outra obra hoje">${escapeHtml(outraObra.sigla)} hoje</span>` : ""}
-      </label>`;
-  }).join("");
-
-  wrap.querySelectorAll("input[type=checkbox]").forEach(cb=>{
-    cb.addEventListener("change", async ()=>{
-      const funcionarioId = cb.dataset.func;
-      const f = funcById(funcionarioId);
-      const entry = state.quentinhas.find(e=>e.data===dateISO && e.funcionarioId===funcionarioId);
-      if(cb.checked){
-        if(entry && entry.obraId !== obraId){
-          const deObra = obraById(entry.obraId);
-          cb.checked = false;
-          confirmModal(
-            `${escapeHtml(f.nome)} já está com quentinha lançada em <b>${deObra?escapeHtml(deObra.nome):"outra obra"}</b> neste dia. Mover para <b>${escapeHtml(obraById(obraId).nome)}</b>?`,
-            async ()=>{
-              try{ await setQuentinha(funcionarioId, dateISO, obraId); toast("Quentinha movida de obra", "ok"); }
-              catch(e){ console.error(e); toast("Erro ao salvar", "err"); }
-            }
-          );
-        }else{
-          try{ await setQuentinha(funcionarioId, dateISO, obraId); }
-          catch(e){ console.error(e); toast("Erro ao salvar. Verifique o Firebase.", "err"); cb.checked=false; }
-        }
-      }else{
-        try{ await setQuentinha(funcionarioId, dateISO, null); }
-        catch(e){ console.error(e); toast("Erro ao remover", "err"); cb.checked=true; }
-      }
-    });
-  });
-}
-
 function renderQuentDaySummary(){
   const wrap = document.getElementById("quent-day-summary");
   if(!wrap) return;
   const { dateISO } = state.quentSel;
   const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
   const valorUnit = Number(state.config.valorQuentinha)||0;
-  const doDia = state.quentinhas.filter(e=>e.data===dateISO);
-  const totalDia = doDia.length * valorUnit;
+  const doDia = state.quentinhas.filter(e=>e.data===dateISO && (Number(e.quantidade)||0)>0);
+  const totalQtd = doDia.reduce((s,e)=>s+(Number(e.quantidade)||0), 0);
 
-  wrap.innerHTML = obrasAtivas.map(o=>{
-    const gente = doDia.filter(e=>e.obraId===o.id).map(e=>funcById(e.funcionarioId)).filter(Boolean);
-    return `<div style="margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">
-        <span class="tag ${obraColorClass(o.id)}">${escapeHtml(o.sigla)}</span>
-        <b style="font-size:13px;">${escapeHtml(o.nome)}</b>
-        <span style="color:var(--steel-600);font-size:12px;margin-left:auto;">${gente.length} · ${brl(gente.length*valorUnit)}</span>
-      </div>
-      ${gente.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${gente.map(f=>`<span class="pill">${escapeHtml(f.nome)}</span>`).join("")}</div>`
-        : `<p style="font-size:12.5px;color:var(--steel-600);margin:0;">Ninguém lançado ainda.</p>`}
+  const linhas = obrasAtivas.map(o=>{
+    const entry = doDia.find(e=>e.obraId===o.id);
+    const qtd = entry ? Number(entry.quantidade)||0 : 0;
+    if(!qtd) return "";
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span><span class="tag ${obraColorClass(o.id)}">${escapeHtml(o.sigla)}</span> ${escapeHtml(o.nome)}</span>
+      <span class="mono">${qtd} · ${brl(qtd*valorUnit)}</span>
     </div>`;
-  }).join("") + `
+  }).join("");
+
+  wrap.innerHTML = (linhas || `<p style="font-size:12.5px;color:var(--steel-600);margin:0 0 10px;">Nenhuma quantidade lançada ainda hoje.</p>`) + `
     <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:4px;display:flex;justify-content:space-between;font-weight:700;font-size:13.5px;">
-      <span>Total do dia</span><span class="mono">${doDia.length} quentinha${doDia.length===1?"":"s"} · ${brl(totalDia)}</span>
+      <span>Total do dia</span><span class="mono">${totalQtd} quentinha${totalQtd===1?"":"s"} · ${brl(totalQtd*valorUnit)}</span>
     </div>`;
 }
 
@@ -1594,7 +1583,7 @@ function computeQuentinhasPorObra(year, month, tipo){
   entries.forEach(e=>{
     const o = obraById(e.obraId);
     if(!o) return;
-    porObra[o.id] = (porObra[o.id]||0)+1;
+    porObra[o.id] = (porObra[o.id]||0) + (Number(e.quantidade)||0);
   });
   const linhas = obrasAtivas.map(o=>({obra:o, qtd:porObra[o.id]||0, valor:(porObra[o.id]||0)*valorUnit}))
     .filter(l=>l.qtd>0).sort((a,b)=>b.qtd-a.qtd);
