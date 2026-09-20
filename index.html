@@ -243,6 +243,17 @@
   .check-row .info .meta{font-size:11.5px;color:var(--steel-600);}
   .check-row.checked{background:var(--moss-100);}
 
+  .subhead{font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--steel-600);font-weight:600;margin:0 0 8px;}
+  .fixed-row{
+    display:flex;align-items:center;gap:11px;padding:10px 6px;border-bottom:1px solid var(--paper-100);
+  }
+  .fixed-row:last-child{border-bottom:none;}
+  .fixed-row .info{flex:1;min-width:0;}
+  .fixed-row .info .name{font-size:13.5px;font-weight:600;}
+  .fixed-row .info .meta{font-size:11.5px;color:var(--steel-600);}
+  .fixed-row.falta{background:var(--brick-100);}
+  .fixed-row.falta .info .name{color:var(--brick-600);}
+
   /* ---------- Quentinhas por obra (quantitativo) ---------- */
   .quent-obra-row{
     display:flex;align-items:center;gap:12px;padding:12px 6px;border-bottom:1px solid var(--paper-100);flex-wrap:wrap;
@@ -521,6 +532,7 @@ function brl(v){ return (v||0).toLocaleString("pt-BR",{style:"currency",currency
 function pct(v){ return (v||0).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1}) + "%"; }
 function pad2(n){ return String(n).padStart(2,"0"); }
 function dateStr(y,m,d){ return `${y}-${pad2(m)}-${pad2(d)}`; }
+function todayISO(){ return dateStr(today.getFullYear(), today.getMonth()+1, today.getDate()); }
 function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
 function toast(msg, type){
   const root = document.getElementById("toast-root");
@@ -553,15 +565,41 @@ function obraById(id){ return state.obras.find(o=>o.id===id); }
 function funcById(id){ return state.funcionarios.find(f=>f.id===id); }
 
 /* ============================================================
+   PRESENÇA EFETIVA DO DIA — mescla obra padrão (implícita) dos
+   contratados com os registros explícitos do dia: falta, mudança
+   pontual de obra, ou lançamento normal de avulso.
+============================================================ */
+function frequenciaEfetivaNoDia(dateISO){
+  const explicit = state.frequencia.filter(e=>e.data===dateISO);
+  const explicitByFunc = new Map(explicit.map(e=>[e.funcionarioId, e]));
+  const resultado = [];
+  state.funcionarios.filter(f=>f.ativo!==false).forEach(f=>{
+    const rec = explicitByFunc.get(f.id);
+    if(rec){
+      if(rec.tipo === "falta") return; // não trabalhou
+      resultado.push({ funcionarioId:f.id, obraId: rec.obraId });
+    }else if(f.vinculo === "CONTRATADO" && f.obraPadraoId && f.obraPadraoDesde && dateISO >= f.obraPadraoDesde){
+      resultado.push({ funcionarioId:f.id, obraId: f.obraPadraoId });
+    }
+    // avulso (ou contratado sem obra padrão) sem registro explícito: não conta, precisa lançar manualmente
+  });
+  return resultado;
+}
+async function setFalta(funcionarioId, dataISO){
+  await setDoc(doc(db,"frequencia",funcionarioId+"_"+dataISO), { funcionarioId, obraId:null, data:dataISO, tipo:"falta" });
+}
+
+/* ============================================================
    MOTOR DE CÁLCULO — dias trabalhados × valor da diária,
    por funcionário × obra, no período selecionado.
 ============================================================ */
 function computeFechamento(year, month, tipo){
   const {start, end} = periodRange(year, month, tipo);
-  const entries = state.frequencia.filter(f=>{
-    const d = new Date(f.data + "T00:00:00");
-    return d.getFullYear()===year && (d.getMonth()+1)===month && d.getDate()>=start && d.getDate()<=end;
-  });
+  const entries = [];
+  for(let d=start; d<=end; d++){
+    const iso = dateStr(year, month, d);
+    frequenciaEfetivaNoDia(iso).forEach(e=> entries.push({ ...e, data: iso }));
+  }
 
   const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
   const funcsAtivos = state.funcionarios.filter(f=>f.ativo!==false);
@@ -626,10 +664,11 @@ function computeRateioSienge(year, month, tipo, funcionarioId){
    dividido pelo custo TOTAL de avulsos no período (não o total geral). */
 function computeRateioPorVinculo(year, month, tipo){
   const {start, end} = periodRange(year, month, tipo);
-  const entries = state.frequencia.filter(f=>{
-    const d = new Date(f.data + "T00:00:00");
-    return d.getFullYear()===year && (d.getMonth()+1)===month && d.getDate()>=start && d.getDate()<=end;
-  });
+  const entries = [];
+  for(let d=start; d<=end; d++){
+    const iso = dateStr(year, month, d);
+    frequenciaEfetivaNoDia(iso).forEach(e=> entries.push(e));
+  }
   const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
   const VINCULOS = ["AVULSO","CONTRATADO"];
   const porObra = { AVULSO:{}, CONTRATADO:{}, OUTROS:{} };
@@ -1067,21 +1106,60 @@ function renderFreqChecklist(){
   const { dateISO, obraId } = state.freqSel;
   const ativos = state.funcionarios.filter(f=>f.ativo!==false);
   const doDia = state.frequencia.filter(e=>e.data===dateISO);
+  const rec = f => doDia.find(e=>e.funcionarioId===f.id);
 
-  wrap.innerHTML = ativos.map(f=>{
-    const entry = doDia.find(e=>e.funcionarioId===f.id);
-    const aqui = entry && entry.obraId === obraId;
-    const outraObra = entry && entry.obraId !== obraId ? obraById(entry.obraId) : null;
+  const equipeFixa = ativos.filter(f=> f.vinculo==="CONTRATADO" && f.obraPadraoId===obraId);
+  const outros = ativos.filter(f=> !(f.vinculo==="CONTRATADO" && f.obraPadraoId===obraId));
+
+  const equipeFixaHtml = equipeFixa.map(f=>{
+    const entry = rec(f);
+    const faltou = entry && entry.tipo === "falta";
+    const emOutraObra = entry && entry.tipo!=="falta" && entry.obraId!==obraId ? obraById(entry.obraId) : null;
+    return `
+      <div class="fixed-row ${faltou?"falta":""}" data-func="${f.id}">
+        <div class="info">
+          <div class="name">${escapeHtml(f.nome)}</div>
+          <div class="meta">${escapeHtml(f.funcao||"—")}</div>
+        </div>
+        ${emOutraObra
+          ? `<span class="tag ${obraColorClass(emOutraObra.id)}" title="Emprestado para outra obra hoje">${escapeHtml(emOutraObra.sigla)} hoje</span>`
+          : `<button class="btn small ${faltou?"danger":""}" data-falta="${f.id}">${faltou?"Faltou ✕":"Presente ✓"}</button>`}
+      </div>`;
+  }).join("");
+
+  const outrosHtml = outros.map(f=>{
+    const entry = rec(f);
+    const aqui = entry && entry.tipo!=="falta" && entry.obraId === obraId;
+    const outraObra = entry && entry.tipo!=="falta" && entry.obraId !== obraId ? obraById(entry.obraId) : null;
     return `
       <label class="check-row ${aqui?"checked":""}" data-func="${f.id}">
         <input type="checkbox" ${aqui?"checked":""} data-func="${f.id}">
         <div class="info">
           <div class="name">${escapeHtml(f.nome)}</div>
-          <div class="meta">${escapeHtml(f.funcao||"—")}</div>
+          <div class="meta">${escapeHtml(f.funcao||"—")}${f.vinculo==="CONTRATADO"?" · obra padrão em outro lugar":" · avulso"}</div>
         </div>
         ${outraObra ? `<span class="tag ${obraColorClass(outraObra.id)}" title="Já lançado em outra obra hoje">${escapeHtml(outraObra.sigla)} hoje</span>` : ""}
       </label>`;
   }).join("");
+
+  wrap.innerHTML = `
+    <h4 class="subhead">Equipe fixa desta obra${equipeFixa.length?` (${equipeFixa.length})`:""}</h4>
+    ${equipeFixa.length ? equipeFixaHtml : `<p style="font-size:12.5px;color:var(--steel-600);margin:0 0 4px;">Nenhum contratado tem esta obra como padrão ainda — defina em Cadastros → Funcionários.</p>`}
+    <h4 class="subhead" style="margin-top:18px;">Avulsos e reforços de hoje</h4>
+    ${outrosHtml}
+  `;
+
+  wrap.querySelectorAll("[data-falta]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const funcionarioId = btn.dataset.falta;
+      const entry = rec(funcById(funcionarioId));
+      const estaFaltando = entry && entry.tipo === "falta";
+      try{
+        if(estaFaltando) await setFrequencia(funcionarioId, dateISO, null);
+        else await setFalta(funcionarioId, dateISO);
+      }catch(e){ console.error(e); toast("Erro ao salvar. Verifique o Firebase.", "err"); }
+    });
+  });
 
   wrap.querySelectorAll("input[type=checkbox]").forEach(cb=>{
     cb.addEventListener("change", async ()=>{
@@ -1089,7 +1167,7 @@ function renderFreqChecklist(){
       const f = funcById(funcionarioId);
       const entry = state.frequencia.find(e=>e.data===dateISO && e.funcionarioId===funcionarioId);
       if(cb.checked){
-        if(entry && entry.obraId !== obraId){
+        if(entry && entry.tipo!=="falta" && entry.obraId !== obraId){
           const deObra = obraById(entry.obraId);
           cb.checked = false; // aguarda confirmação
           confirmModal(
@@ -1117,11 +1195,14 @@ function renderFreqDaySummary(){
   const { dateISO } = state.freqSel;
   const obrasAtivas = state.obras.filter(o=>o.ativo!==false);
   const ativos = state.funcionarios.filter(f=>f.ativo!==false);
-  const doDia = state.frequencia.filter(e=>e.data===dateISO);
-  const semLancamento = ativos.filter(f=> !doDia.some(e=>e.funcionarioId===f.id));
+  const efetivo = frequenciaEfetivaNoDia(dateISO);
+  const idsComEfetivo = new Set(efetivo.map(e=>e.funcionarioId));
+  const faltas = state.frequencia.filter(e=>e.data===dateISO && e.tipo==="falta")
+    .map(e=>funcById(e.funcionarioId)).filter(Boolean);
+  const semNada = ativos.filter(f=> !idsComEfetivo.has(f.id) && !faltas.some(x=>x.id===f.id));
 
   wrap.innerHTML = obrasAtivas.map(o=>{
-    const gente = doDia.filter(e=>e.obraId===o.id).map(e=>funcById(e.funcionarioId)).filter(Boolean);
+    const gente = efetivo.filter(e=>e.obraId===o.id).map(e=>funcById(e.funcionarioId)).filter(Boolean);
     return `<div style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">
         <span class="tag ${obraColorClass(o.id)}">${escapeHtml(o.sigla)}</span>
@@ -1134,11 +1215,19 @@ function renderFreqDaySummary(){
   }).join("") + `
     <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:4px;">
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">
-        <span class="pill off">?</span><b style="font-size:13px;">Sem lançamento hoje</b>
-        <span style="color:var(--steel-600);font-size:12px;margin-left:auto;">${semLancamento.length}</span>
+        <span class="pill off">✕</span><b style="font-size:13px;">Faltou hoje</b>
+        <span style="color:var(--steel-600);font-size:12px;margin-left:auto;">${faltas.length}</span>
       </div>
-      ${semLancamento.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${semLancamento.map(f=>`<span class="pill">${escapeHtml(f.nome)}</span>`).join("")}</div>`
-        : `<p style="font-size:12.5px;color:var(--steel-600);margin:0;">Todo mundo já tem obra hoje.</p>`}
+      ${faltas.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${faltas.map(f=>`<span class="pill">${escapeHtml(f.nome)}</span>`).join("")}</div>`
+        : `<p style="font-size:12.5px;color:var(--steel-600);margin:0;">Ninguém faltou hoje.</p>`}
+    </div>
+    <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px;">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">
+        <span class="pill off">?</span><b style="font-size:13px;">Sem obra hoje</b>
+        <span style="color:var(--steel-600);font-size:12px;margin-left:auto;">${semNada.length}</span>
+      </div>
+      ${semNada.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${semNada.map(f=>`<span class="pill">${escapeHtml(f.nome)}</span>`).join("")}</div>`
+        : `<p style="font-size:12.5px;color:var(--steel-600);margin:0;">Todo mundo está contabilizado hoje.</p>`}
     </div>`;
 }
 
@@ -1555,7 +1644,7 @@ function computeFolhaPorObra(obraId, year, month, tipo){
   const rows = [];
   for(let d=start; d<=end; d++){
     const iso = dateStr(year, month, d);
-    const pessoas = state.frequencia.filter(e=>e.obraId===obraId && e.data===iso)
+    const pessoas = frequenciaEfetivaNoDia(iso).filter(e=>e.obraId===obraId)
       .map(e=>funcById(e.funcionarioId)).filter(Boolean).sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR"));
     rows.push({dia:d, iso, pessoas});
   }
@@ -1566,7 +1655,7 @@ function computeFolhaPorFuncionario(funcionarioId, year, month, tipo){
   const rows = [];
   for(let d=start; d<=end; d++){
     const iso = dateStr(year, month, d);
-    const entry = state.frequencia.find(e=>e.funcionarioId===funcionarioId && e.data===iso);
+    const entry = frequenciaEfetivaNoDia(iso).find(e=>e.funcionarioId===funcionarioId);
     rows.push({dia:d, iso, obra: entry ? obraById(entry.obraId) : null});
   }
   return rows;
@@ -1945,11 +2034,13 @@ function buildImportPlan(rhRows){
     }else{
       const precisaReativar = existente.ativo===false;
       const mudouFuncao = (existente.funcao||"") !== row.funcao;
-      const mudouObra = (existente.obraNomeRH||"") !== (row.obra||"");
-      if(precisaReativar || mudouFuncao || mudouObra){
+      const mudouObraTexto = (existente.obraNomeRH||"") !== (row.obra||"");
+      const obraPadraoIdFinal = obraMatch ? obraMatch.id : (existente.obraPadraoId||null);
+      const obraPadraoMudou = (existente.obraPadraoId||null) !== obraPadraoIdFinal;
+      if(precisaReativar || mudouFuncao || mudouObraTexto){
         plan.atualizados.push({
           id: existente.id, nome: existente.nome, funcao: row.funcao, obraNomeRH: row.obra||null,
-          obraPadraoId: obraMatch ? obraMatch.id : (existente.obraPadraoId||null), reativar: precisaReativar
+          obraPadraoId: obraPadraoIdFinal, obraPadraoMudou, reativar: precisaReativar
         });
       }else plan.semAlteracao++;
     }
@@ -1959,11 +2050,14 @@ function buildImportPlan(rhRows){
 
 async function applyImportPlan(plan){
   for(const n of plan.novos){
-    await saveFuncionario({ nome:n.nome, funcao:n.funcao, vinculo:"CONTRATADO", valorDiaria:0, ativo:true, origem:"rh", obraNomeRH:n.obraNomeRH, obraPadraoId:n.obraPadraoId });
+    const payload = { nome:n.nome, funcao:n.funcao, vinculo:"CONTRATADO", valorDiaria:0, ativo:true, origem:"rh", obraNomeRH:n.obraNomeRH, obraPadraoId:n.obraPadraoId };
+    if(n.obraPadraoId) payload.obraPadraoDesde = todayISO();
+    await saveFuncionario(payload);
   }
   for(const u of plan.atualizados){
     const data = { funcao:u.funcao, obraNomeRH:u.obraNomeRH, obraPadraoId:u.obraPadraoId };
     if(u.reativar) data.ativo = true;
+    if(u.obraPadraoMudou) data.obraPadraoDesde = u.obraPadraoId ? todayISO() : null;
     await saveFuncionario(data, u.id);
   }
   for(const d of plan.desligados){
@@ -2012,6 +2106,13 @@ function renderFuncionarioTab(){
         </div>
       </div>
       <div class="field"><label>Valor da diária (R$)</label><input required id="ff-diaria" type="number" min="0" step="0.01" placeholder="180.00" value="${f?f.valorDiaria:""}"></div>
+      <div class="field"><label>Obra padrão (só para contratados)</label>
+        <select id="ff-obra-padrao">
+          <option value="">— nenhuma —</option>
+          ${state.obras.filter(o=>o.ativo!==false).map(o=>`<option value="${o.id}" ${f&&f.obraPadraoId===o.id?"selected":""}>${escapeHtml(o.sigla)} — ${escapeHtml(o.nome)}</option>`).join("")}
+        </select>
+        <p style="font-size:11.5px;color:var(--steel-600);margin:6px 0 0;">Contratado com obra padrão já entra como presente todo dia na Frequência — você só marca falta ou troca pontual.</p>
+      </div>
       <div style="display:flex;gap:8px;">
         <button class="btn dark" type="submit" style="flex:1;">${f ? "Salvar alterações" : "Adicionar funcionário"}</button>
         ${f ? `<button class="btn" type="button" id="btn-cancelar-edicao-func">Cancelar</button>` : ""}
@@ -2026,6 +2127,13 @@ function renderFuncionarioTab(){
       data.funcao = document.getElementById("ff-funcao").value.trim();
       data.vinculo = document.getElementById("ff-vinculo").value;
       if(!data.nome) return;
+    }
+    const vinculoFinal = ehRH ? "CONTRATADO" : data.vinculo;
+    const obraPadraoNovo = vinculoFinal === "CONTRATADO" ? (document.getElementById("ff-obra-padrao").value || null) : null;
+    const obraPadraoAnterior = f ? (f.obraPadraoId||null) : null;
+    data.obraPadraoId = obraPadraoNovo;
+    if(obraPadraoNovo !== obraPadraoAnterior){
+      data.obraPadraoDesde = obraPadraoNovo ? todayISO() : null;
     }
     if(!editingFuncId){ data.ativo = true; data.origem = "avulso"; }
     try{
