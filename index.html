@@ -1877,19 +1877,137 @@ function renderConfigTab(){
   });
 }
 
+/* ============================================================
+   IMPORTAÇÃO DO RH — lê o CSV que o Sistema RH já exporta
+   (botão "Exportar CSV" de lá) e traz só Nome, Função, Obra e
+   Status. CPF, RG, salário e demais campos sensíveis são
+   ignorados e nunca chegam a esta aplicação.
+============================================================ */
+function parseCsv(text){
+  if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){ if(text[i+1] === '"'){ field+='"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ',' ){ row.push(field); field=""; }
+      else if(c === '\r'){ /* ignora, \n cuida da quebra */ }
+      else if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=""; }
+      else field += c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=> r.length>1 || (r.length===1 && r[0]!==""));
+}
+
+function parseRHColaboradoresCsv(rows){
+  if(!rows.length) return null;
+  const header = rows[0].map(h=>h.trim());
+  const idx = {
+    nome: header.indexOf("Nome"),
+    funcao: header.indexOf("Função"),
+    obra: header.indexOf("Obra/Lotação"),
+    status: header.indexOf("Status")
+  };
+  if(idx.nome===-1 || idx.status===-1) return null;
+  return rows.slice(1).map(r=>({
+    nome: (r[idx.nome]||"").trim(),
+    funcao: (r[idx.funcao]||"").trim(),
+    obra: (r[idx.obra]||"").trim(),
+    status: (r[idx.status]||"").trim().toLowerCase()
+  })).filter(x=>x.nome);
+}
+
+function normNome(s){ return (s||"").trim().toLowerCase().replace(/\s+/g," "); }
+
+function buildImportPlan(rhRows){
+  const existentesRH = state.funcionarios.filter(f=>f.origem==="rh");
+  const plan = { novos:[], atualizados:[], desligados:[], obrasNaoMapeadas:new Set(), semAlteracao:0 };
+
+  rhRows.forEach(row=>{
+    const key = normNome(row.nome);
+    const existente = existentesRH.find(f=>normNome(f.nome)===key);
+    const obraMatch = row.obra ? state.obras.find(o=>normNome(o.nome)===normNome(row.obra)) : null;
+    if(row.obra && !obraMatch) plan.obrasNaoMapeadas.add(row.obra);
+
+    if(row.status === "desligado"){
+      if(existente && existente.ativo!==false) plan.desligados.push({ id: existente.id, nome: existente.nome });
+      return;
+    }
+    if(row.status === "admissao") return; // ainda em admissão, não conta como efetivo no canteiro
+
+    if(!existente){
+      plan.novos.push({ nome: row.nome, funcao: row.funcao, obraNomeRH: row.obra||null, obraPadraoId: obraMatch?obraMatch.id:null });
+    }else{
+      const precisaReativar = existente.ativo===false;
+      const mudouFuncao = (existente.funcao||"") !== row.funcao;
+      const mudouObra = (existente.obraNomeRH||"") !== (row.obra||"");
+      if(precisaReativar || mudouFuncao || mudouObra){
+        plan.atualizados.push({
+          id: existente.id, nome: existente.nome, funcao: row.funcao, obraNomeRH: row.obra||null,
+          obraPadraoId: obraMatch ? obraMatch.id : (existente.obraPadraoId||null), reativar: precisaReativar
+        });
+      }else plan.semAlteracao++;
+    }
+  });
+  return plan;
+}
+
+async function applyImportPlan(plan){
+  for(const n of plan.novos){
+    await saveFuncionario({ nome:n.nome, funcao:n.funcao, vinculo:"CONTRATADO", valorDiaria:0, ativo:true, origem:"rh", obraNomeRH:n.obraNomeRH, obraPadraoId:n.obraPadraoId });
+  }
+  for(const u of plan.atualizados){
+    const data = { funcao:u.funcao, obraNomeRH:u.obraNomeRH, obraPadraoId:u.obraPadraoId };
+    if(u.reativar) data.ativo = true;
+    await saveFuncionario(data, u.id);
+  }
+  for(const d of plan.desligados){
+    await saveFuncionario({ ativo:false }, d.id);
+  }
+}
+
+function importSummaryHtml(plan){
+  const obrasNaoMapeadas = [...plan.obrasNaoMapeadas];
+  return `
+    <h3>Importar do RH — resumo</h3>
+    <p style="font-size:13px;color:var(--steel-600);margin-bottom:14px;">Confira antes de aplicar. Nada é salvo até você confirmar.</p>
+    <ul style="font-size:13.5px;line-height:1.8;margin:0 0 14px;padding-left:18px;">
+      <li><b>${plan.novos.length}</b> novo${plan.novos.length===1?"":"s"} contratado${plan.novos.length===1?"":"s"}</li>
+      <li><b>${plan.atualizados.length}</b> atualizado${plan.atualizados.length===1?"":"s"} (função, obra ou reativação)</li>
+      <li><b>${plan.desligados.length}</b> será${plan.desligados.length===1?"":"ão"} desativado${plan.desligados.length===1?"":"s"} (desligado${plan.desligados.length===1?"":"s"} no RH)</li>
+      <li>${plan.semAlteracao} sem alteração</li>
+    </ul>
+    ${obrasNaoMapeadas.length ? `<div class="alert-item warn" style="margin-bottom:14px;">
+      <span class="alert-icon">⚠</span>
+      <span><b>${obrasNaoMapeadas.length}</b> obra${obrasNaoMapeadas.length===1?"":"s"} do RH não encontrada${obrasNaoMapeadas.length===1?"":"s"} aqui: ${obrasNaoMapeadas.map(escapeHtml).join(", ")}. Esses colaboradores entram sem obra padrão vinculada — confira o nome da obra ou cadastre-a aqui.</span>
+    </div>` : ""}
+    <div class="actions">
+      <button class="btn" id="modal-cancel-import">Cancelar</button>
+      <button class="btn dark" id="modal-confirm-import">Confirmar importação</button>
+    </div>
+  `;
+}
+
 let editingFuncId = null;
 function renderFuncionarioTab(){
   const f = editingFuncId ? funcById(editingFuncId) : null;
+  const ehRH = f && f.origem === "rh";
   document.getElementById("cad-form-wrap").innerHTML = `
-    <h3 style="font-size:14.5px;margin-bottom:14px;">${f ? "Editar funcionário" : "Novo funcionário"}</h3>
+    <h3 style="font-size:14.5px;margin-bottom:14px;">${f ? "Editar funcionário" : "Novo funcionário avulso"}</h3>
+    ${ehRH ? `<p style="font-size:12px;color:var(--steel-600);margin:-6px 0 14px;">Nome e função vêm do Sistema RH — reimporte o CSV para atualizar. Aqui você só ajusta o valor da diária.</p>` : ""}
     <form id="form-func">
-      <div class="field"><label>Nome</label><input required id="ff-nome" placeholder="ex: José Carlos" value="${f?escapeHtml(f.nome):""}"></div>
+      <div class="field"><label>Nome</label><input required id="ff-nome" placeholder="ex: José Carlos" value="${f?escapeHtml(f.nome):""}" ${ehRH?"disabled":""}></div>
       <div class="field-row">
-        <div class="field"><label>Função</label><input id="ff-funcao" placeholder="ex: Pedreiro, Servente..." value="${f?escapeHtml(f.funcao||""):""}"></div>
+        <div class="field"><label>Função</label><input id="ff-funcao" placeholder="ex: Pedreiro, Servente..." value="${f?escapeHtml(f.funcao||""):""}" ${ehRH?"disabled":""}></div>
         <div class="field"><label>Vínculo</label>
-          <select id="ff-vinculo">
+          <select id="ff-vinculo" ${ehRH?"disabled":""}>
             <option value="AVULSO" ${f&&f.vinculo==="AVULSO"?"selected":""}>Avulso</option>
-            <option value="CONTRATADO" ${f&&f.vinculo==="CONTRATADO"?"selected":""}>Contratado</option>
+            <option value="CONTRATADO" ${(ehRH||(f&&f.vinculo==="CONTRATADO"))?"selected":""}>Contratado</option>
           </select>
         </div>
       </div>
@@ -1902,14 +2020,14 @@ function renderFuncionarioTab(){
   `;
   document.getElementById("form-func").addEventListener("submit", async e=>{
     e.preventDefault();
-    const data = {
-      nome: document.getElementById("ff-nome").value.trim(),
-      funcao: document.getElementById("ff-funcao").value.trim(),
-      vinculo: document.getElementById("ff-vinculo").value,
-      valorDiaria: Number(document.getElementById("ff-diaria").value)||0
-    };
-    if(!data.nome) return;
-    if(!editingFuncId) data.ativo = true;
+    const data = { valorDiaria: Number(document.getElementById("ff-diaria").value)||0 };
+    if(!ehRH){
+      data.nome = document.getElementById("ff-nome").value.trim();
+      data.funcao = document.getElementById("ff-funcao").value.trim();
+      data.vinculo = document.getElementById("ff-vinculo").value;
+      if(!data.nome) return;
+    }
+    if(!editingFuncId){ data.ativo = true; data.origem = "avulso"; }
     try{
       await saveFuncionario(data, editingFuncId || undefined);
       toast(editingFuncId ? "Alterações salvas" : "Funcionário adicionado", "ok");
@@ -1921,12 +2039,13 @@ function renderFuncionarioTab(){
   document.getElementById("btn-cancelar-edicao-func")?.addEventListener("click", ()=>{ editingFuncId = null; renderFuncionarioTab(); });
 
   const wrap = document.getElementById("cad-list-wrap");
-  wrap.innerHTML = `<h3 style="font-size:14.5px;margin-bottom:8px;">Equipe (${state.funcionarios.length})</h3>` +
-    (state.funcionarios.length ? state.funcionarios.map(fu=>`
+  const contratadosRH = state.funcionarios.filter(fu=>fu.origem==="rh");
+  const avulsos = state.funcionarios.filter(fu=>fu.origem!=="rh");
+  const linhaFunc = fu => `
       <div class="list-row">
         <div class="info">
           <div class="name">${escapeHtml(fu.nome)}</div>
-          <div class="meta">${escapeHtml(fu.funcao||"—")} · ${escapeHtml(fu.vinculo||"—")} · ${brl(fu.valorDiaria)}/dia</div>
+          <div class="meta">${escapeHtml(fu.funcao||"—")} · ${brl(fu.valorDiaria)}/dia${fu.obraNomeRH?` · obra padrão: ${escapeHtml(fu.obraNomeRH)}`:""}</div>
         </div>
         <span class="pill ${fu.ativo!==false?"on":"off"}">${fu.ativo!==false?"ativo":"inativo"}</span>
         <div class="actions">
@@ -1934,7 +2053,44 @@ function renderFuncionarioTab(){
           <button class="btn small" data-toggle="${fu.id}">${fu.ativo!==false?"Desativar":"Ativar"}</button>
           <button class="btn small danger" data-del="${fu.id}">Excluir</button>
         </div>
-      </div>`).join("") : emptyState("Nenhum funcionário", "Adicione o primeiro ao lado."));
+      </div>`;
+
+  wrap.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <h3 style="font-size:14.5px;margin:0;">Equipe (${state.funcionarios.length})</h3>
+      <div>
+        <input type="file" id="rh-csv-input" accept=".csv" style="display:none;">
+        <button class="btn small" id="btn-importar-rh">Importar do RH (CSV)</button>
+      </div>
+    </div>
+    <h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--steel-600);margin:14px 0 4px;">Contratados (RH) — ${contratadosRH.length}</h4>
+    ${contratadosRH.length ? contratadosRH.map(linhaFunc).join("") : `<p style="font-size:12.5px;color:var(--steel-600);margin:6px 0 0;">Nenhum ainda — importe o CSV do Sistema RH.</p>`}
+    <h4 style="font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--steel-600);margin:18px 0 4px;">Avulsos — ${avulsos.length}</h4>
+    ${avulsos.length ? avulsos.map(linhaFunc).join("") : `<p style="font-size:12.5px;color:var(--steel-600);margin:6px 0 0;">Nenhum avulso cadastrado ainda.</p>`}
+  `;
+
+  document.getElementById("btn-importar-rh").addEventListener("click", ()=> document.getElementById("rh-csv-input").click());
+  document.getElementById("rh-csv-input").addEventListener("change", async e=>{
+    const file = e.target.files[0];
+    e.target.value = "";
+    if(!file) return;
+    const text = await file.text();
+    const rows = parseCsv(text);
+    const rhRows = parseRHColaboradoresCsv(rows);
+    if(!rhRows){ toast("Não reconheci esse arquivo. Confirme que é o CSV exportado pelo Sistema RH.", "err"); return; }
+    if(!rhRows.length){ toast("Nenhum colaborador encontrado no arquivo.", "err"); return; }
+    const plan = buildImportPlan(rhRows);
+    if(!plan.novos.length && !plan.atualizados.length && !plan.desligados.length){
+      toast("Nada novo para importar — já está tudo atualizado.", "ok");
+      return;
+    }
+    modal(importSummaryHtml(plan));
+    document.getElementById("modal-cancel-import").addEventListener("click", closeModal);
+    document.getElementById("modal-confirm-import").addEventListener("click", async ()=>{
+      try{ await applyImportPlan(plan); toast("Importação concluída", "ok"); closeModal(); }
+      catch(err){ console.error(err); toast("Erro ao importar. Verifique o Firebase.", "err"); }
+    });
+  });
 
   wrap.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click", ()=>{
     editingFuncId = b.dataset.edit;
@@ -1954,6 +2110,7 @@ function renderFuncionarioTab(){
     );
   }));
 }
+
 
 let editingObraId = null;
 function renderObraTab(){
